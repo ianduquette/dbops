@@ -41,13 +41,32 @@ public class MainWindow : Window {
             Y = 3
         };
 
+        // Column headers for session list (perfectly aligned with DisplayText format)
+        var headerFormat = $"[{"Database",-12}] {"Program",-20} | {"Machine",-15} | PID: {"PID",-6} | {"Status",-18} | {"Type",-20}";
+        var sessionHeaderLabel = new Label(headerFormat) {
+            X = 1,
+            Y = 4,
+            ColorScheme = new ColorScheme {
+                Normal = Application.Driver.MakeAttribute(Color.White, Color.DarkGray)
+            }
+        };
+
         // Session list view - across the top, horizontal layout (full width)
         _sessionListView = new ListView() {
             X = 1,
-            Y = 4,
+            Y = 5,
             Width = Dim.Fill() - 1,  // Use full width minus just the right border
             Height = Dim.Percent(25),
-            CanFocus = true
+            CanFocus = true,
+            TabStop = true
+        };
+
+        // Set up color scheme - yellow background highlighting for selected items
+        _sessionListView.ColorScheme = new ColorScheme {
+            Normal = Application.Driver.MakeAttribute(Color.White, Color.Black), // Non-selected items
+            Focus = Application.Driver.MakeAttribute(Color.Black, Color.BrightYellow), // Selected item - YELLOW BACKGROUND
+            HotNormal = Application.Driver.MakeAttribute(Color.Black, Color.BrightYellow), // Selected item when not focused - YELLOW BACKGROUND
+            HotFocus = Application.Driver.MakeAttribute(Color.Black, Color.BrightYellow) // Selected item when focused - YELLOW BACKGROUND
         };
 
         // Session details label - bottom left
@@ -91,7 +110,7 @@ public class MainWindow : Window {
         };
 
         // Add all components first
-        Add(_connectionLabel, _sessionCountLabel, _sessionListView, _queryLabel,
+        Add(_connectionLabel, _sessionCountLabel, sessionHeaderLabel, _sessionListView, _queryLabel,
             _queryTextView, currentQueryLabel, _currentQueryTextView, _statusLabel);
 
         // Create scrollbar for session list view
@@ -321,7 +340,9 @@ public class MainWindow : Window {
             // Refresh the data
             _sessions = _postgresService.GetActiveSessions();
 
+            // Create session display list
             var sessionTexts = _sessions.Select(s => s.DisplayText).ToList();
+
             _sessionListView.SetSource(sessionTexts);
 
             _sessionCountLabel.Text = $"Active Sessions ({_sessions.Count}):";
@@ -376,5 +397,8 @@ public class MainWindow : Window {
     public void Initialize() {
         // Load initial data synchronously
         RefreshSessions();
+
+        // Ensure the session list has focus for highlighting to work
+        _sessionListView.SetFocus();
     }
 }

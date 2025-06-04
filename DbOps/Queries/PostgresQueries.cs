@@ -8,6 +8,7 @@ public static class PostgresQueries {
             usename as username,
             application_name,
             client_addr,
+            client_hostname,
             state,
             COALESCE(query, '') as query,
             query_start,
@@ -15,7 +16,11 @@ public static class PostgresQueries {
             wait_event,
             state_change,
             backend_start,
-            xact_start
+            xact_start,
+            CASE
+                WHEN state = 'active' THEN true
+                ELSE false
+            END as is_active
         FROM pg_stat_activity
         WHERE state != 'idle'
             AND pid != pg_backend_pid()

@@ -33,7 +33,7 @@ This is to be a simple TUI application. The purpose is to allow the user to sele
             - Mode Held
             - Mode Requested
             - Any lock Ids.
-            - Based on what Postgres provides highlight if the loc is blocking                
+            - Based on what Postgres provides highlight if the loc is blocking
         1. If the Q key is pressed in ANY control it should prompt user to quit. (Current bug)
 1. The section that displays the current connection should stand out to the user with a different colored background (black would be a good attempt.)  However it should not be too bright or obnoxious
 1. The application should have the ability to add a new connection.  Users will be prompted for standard Postgres connection credentials.

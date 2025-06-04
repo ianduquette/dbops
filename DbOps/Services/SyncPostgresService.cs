@@ -56,14 +56,17 @@ public class SyncPostgresService {
                     Username = reader.IsDBNull(2) ? "" : reader.GetString(2),
                     ApplicationName = reader.IsDBNull(3) ? "" : reader.GetString(3),
                     ClientAddress = reader.IsDBNull(4) ? "" : reader.GetValue(4)?.ToString() ?? "",
-                    State = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                    CurrentQuery = reader.IsDBNull(6) ? "" : reader.GetString(6),
-                    QueryStart = reader.IsDBNull(7) ? null : reader.GetDateTime(7),
-                    WaitEventType = reader.IsDBNull(8) ? null : reader.GetString(8),
-                    WaitEvent = reader.IsDBNull(9) ? null : reader.GetString(9),
-                    StateChange = reader.IsDBNull(10) ? null : reader.GetDateTime(10),
-                    BackendStart = reader.IsDBNull(11) ? null : reader.GetDateTime(11),
-                    TransactionStart = reader.IsDBNull(12) ? null : reader.GetDateTime(12)
+                    ClientHostname = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    State = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    CurrentQuery = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    QueryStart = reader.IsDBNull(8) ? null : reader.GetDateTime(8),
+                    WaitEventType = reader.IsDBNull(9) ? null : reader.GetString(9),
+                    WaitEvent = reader.IsDBNull(10) ? null : reader.GetString(10),
+                    StateChange = reader.IsDBNull(11) ? null : reader.GetDateTime(11),
+                    BackendStart = reader.IsDBNull(12) ? null : reader.GetDateTime(12),
+                    TransactionStart = reader.IsDBNull(13) ? null : reader.GetDateTime(13),
+                    IsActive = !reader.IsDBNull(14) && reader.GetBoolean(14),
+                    ServerName = GetConnectionInfo() // Set server name from connection info
                 };
 
                 sessions.Add(session);

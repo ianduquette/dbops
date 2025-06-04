@@ -17,18 +17,33 @@ public class DatabaseSession {
     public DateTime? BackendStart { get; set; }
     public DateTime? TransactionStart { get; set; }
 
+    // Enhanced session information properties
+    public string ClientHostname { get; set; } = string.Empty;
+    public string ServerName { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+
     // Locking information properties
     public List<DatabaseLock> Locks { get; set; } = new();
     public List<BlockingRelationship> BlockingRelationships { get; set; } = new();
 
+    // Computed properties for requirements mapping
+    public string Machine => !string.IsNullOrEmpty(ClientHostname) ? ClientHostname : ClientAddress;
+    public string OSUser => "N/A"; // PostgreSQL doesn't provide OS user information
+    public string Server => ServerName;
+    public int SID => Pid; // Use PID as Session ID equivalent
+    public string Terminal => "N/A"; // PostgreSQL doesn't provide terminal information
+    public string Type => DetermineSessionType();
+
     public string DisplayText {
         get {
-            // Truncate long application names and database names to prevent scroll bar shifting
-            var dbName = DatabaseName.Length > 15 ? DatabaseName[..12] + "..." : DatabaseName;
-            var appName = ApplicationName.Length > 25 ? ApplicationName[..22] + "..." : ApplicationName;
-            var stateText = State.Length > 30 ? State[..27] + "..." : State;
+            // Enhanced display format with new fields
+            var dbName = DatabaseName.Length > 12 ? DatabaseName[..9] + "..." : DatabaseName;
+            var appName = ApplicationName.Length > 20 ? ApplicationName[..17] + "..." : ApplicationName;
+            var machine = Machine.Length > 15 ? Machine[..12] + "..." : Machine;
+            var stateText = State.Length > 18 ? State[..15] + "..." : State;
+            var typeText = Type.Length > 20 ? Type[..17] + "..." : Type;
 
-            return $"[{dbName,-15}] {appName,-25} - PID: {Pid,6} - State: {stateText,-30}";
+            return $"[{dbName,-12}] {appName,-20} | {machine,-15} | PID: {Pid,6} | {stateText,-18} | {typeText,-20}";
         }
     }
 
@@ -38,13 +53,18 @@ public class DatabaseSession {
 
     public string GetSessionDetails() {
         return $"Session Information:\n" +
-               $"PID: {Pid}\n" +
+               $"PID (SID): {Pid}\n" +
                $"Database: {DatabaseName}\n" +
-               $"Application: {ApplicationName}\n" +
+               $"Program: {ApplicationName}\n" +
+               $"Machine: {Machine}\n" +
+               $"OS User: {OSUser}\n" +
+               $"Server: {Server}\n" +
+               $"Status: {State}\n" +
+               $"Terminal: {Terminal}\n" +
+               $"Type: {Type}\n" +
                $"Username: {Username}\n" +
-               $"Client Address: {ClientAddress}\n" +
-               $"State: {State}\n" +
-               $"Query Start: {QueryStart?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A"}\n\n" +
+               $"Query Start: {QueryStart?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A"}\n" +
+               $"Active: {(IsActive ? "Yes" : "No")}\n\n" +
                $"Session Timing:\n" +
                (BackendStart.HasValue ? $"Session Started: {BackendStart.Value:yyyy-MM-dd HH:mm:ss}\n" : "") +
                (TransactionStart.HasValue ? $"Transaction Started: {TransactionStart.Value:yyyy-MM-dd HH:mm:ss}\n" : "") +
@@ -129,6 +149,25 @@ public class DatabaseSession {
         }
 
         return lockInfo;
+    }
+
+    private string DetermineSessionType() {
+        if (string.IsNullOrEmpty(ApplicationName)) {
+            return "Unknown";
+        }
+
+        // Determine session type based on application name and state
+        var appLower = ApplicationName.ToLowerInvariant();
+
+        if (appLower.Contains("psql")) return "Interactive";
+        if (appLower.Contains("pgadmin")) return "Admin Tool";
+        if (appLower.Contains("jdbc") || appLower.Contains("npgsql") || appLower.Contains("psycopg")) return "Application";
+        if (appLower.Contains("backup") || appLower.Contains("restore")) return "Maintenance";
+        if (appLower.Contains("replication")) return "Replication";
+        if (State == "active") return "Active Query";
+        if (State.Contains("idle")) return "Idle Connection";
+
+        return "Application";
     }
 
     private static string FormatDuration(TimeSpan duration) {
