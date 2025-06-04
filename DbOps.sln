@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DbOps", "DbOps\DbOps.csproj", "{39B46674-4BA7-9D2C-62DC-755C032C18BE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{39B46674-4BA7-9D2C-62DC-755C032C18BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39B46674-4BA7-9D2C-62DC-755C032C18BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39B46674-4BA7-9D2C-62DC-755C032C18BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39B46674-4BA7-9D2C-62DC-755C032C18BE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5961B37B-F390-449A-991F-E3B3D31B4DB4}
+	EndGlobalSection
+EndGlobal

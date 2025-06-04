@@ -1,0 +1,327 @@
+using DbOps.Models;
+using DbOps.Services;
+using Terminal.Gui;
+
+namespace DbOps.UI;
+
+public class MainWindow : Window {
+    private readonly SyncPostgresService _postgresService;
+    private ListView _sessionListView = null!;
+    private ScrollBarView _sessionListScrollBar = null!;
+
+    private Label _connectionLabel = null!;
+    private Label _sessionCountLabel = null!;
+    private Label _queryLabel = null!;
+    private TextView _queryTextView = null!;
+    private ScrollBarView _queryTextScrollBar = null!;
+    private TextView _currentQueryTextView = null!;
+    private ScrollBarView _currentQueryScrollBar = null!;
+    private Label _statusLabel = null!;
+    private List<DatabaseSession> _sessions = new();
+    private enum DisplayMode { SessionDetails, WaitInformation }
+    private DisplayMode _currentDisplayMode = DisplayMode.SessionDetails;
+
+    public MainWindow(SyncPostgresService postgresService) : base("PostgreSQL Database Monitor") {
+        _postgresService = postgresService;
+        InitializeComponents();
+        SetupLayout();
+        SetupEventHandlers();
+    }
+
+    private void InitializeComponents() {
+        // Connection info label
+        _connectionLabel = new Label($"Connected to: {_postgresService.GetConnectionInfo()}") {
+            X = 1,
+            Y = 1
+        };
+
+        // Session count label
+        _sessionCountLabel = new Label("Active Sessions (0):") {
+            X = 1,
+            Y = 3
+        };
+
+        // Session list view - across the top, horizontal layout
+        _sessionListView = new ListView() {
+            X = 1,
+            Y = 4,
+            Width = Dim.Fill() - 2,  // Leave space for scrollbar
+            Height = Dim.Percent(15),
+            CanFocus = true
+        };
+
+        // Session details label - bottom left
+        _queryLabel = new Label("Selected Session Details:") {
+            X = 1,
+            Y = Pos.Bottom(_sessionListView) + 1
+        };
+
+        // Session details view - bottom left half
+        _queryTextView = new TextView() {
+            X = 1,
+            Y = Pos.Bottom(_queryLabel),
+            Width = Dim.Percent(50) - 2,  // Leave space for scrollbar
+            Height = Dim.Fill() - 3,
+            ReadOnly = true,
+            Text = "No session selected\n\nUse ↑↓ arrows to navigate sessions",
+            WordWrap = true
+        };
+
+        // Current Query label - bottom right
+        var currentQueryLabel = new Label("Current Query:") {
+            X = Pos.Right(_queryTextView) + 1,
+            Y = Pos.Bottom(_sessionListView) + 1
+        };
+
+        // Current Query view - bottom right half
+        _currentQueryTextView = new TextView() {
+            X = Pos.Right(_queryTextView) + 1,
+            Y = Pos.Bottom(currentQueryLabel),
+            Width = Dim.Fill() - 2,  // Leave space for scrollbar
+            Height = Dim.Fill() - 3,
+            ReadOnly = true,
+            Text = "Select a session to view its current query",
+            WordWrap = true
+        };
+
+        // Status label
+        _statusLabel = new Label("[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [Q] Quit | Mode: Session Details") {
+            X = 1,
+            Y = Pos.AnchorEnd(1)
+        };
+
+        // Add all components first
+        Add(_connectionLabel, _sessionCountLabel, _sessionListView, _queryLabel,
+            _queryTextView, currentQueryLabel, _currentQueryTextView, _statusLabel);
+
+        // Create scrollbar for session list view
+        _sessionListScrollBar = new ScrollBarView(_sessionListView, true, false) {
+            X = Pos.Right(_sessionListView),
+            Y = Pos.Top(_sessionListView),
+            Height = Dim.Height(_sessionListView)
+        };
+
+        // Set up session list scrollbar event handlers
+        _sessionListScrollBar.ChangedPosition += () => {
+            _sessionListView.TopItem = _sessionListScrollBar.Position;
+            if (_sessionListView.TopItem != _sessionListScrollBar.Position) {
+                _sessionListScrollBar.Position = _sessionListView.TopItem;
+            }
+            _sessionListView.SetNeedsDisplay();
+        };
+
+        _sessionListView.DrawContent += (e) => {
+            _sessionListScrollBar.Size = _sessionListView.Source.Count;
+            _sessionListScrollBar.Position = _sessionListView.TopItem;
+            _sessionListScrollBar.Refresh();
+        };
+
+        // Create scrollbar for query text view
+        _queryTextScrollBar = new ScrollBarView(_queryTextView, true, false) {
+            X = Pos.Right(_queryTextView),
+            Y = Pos.Top(_queryTextView),
+            Height = Dim.Height(_queryTextView)
+        };
+
+        // Set up query text scrollbar event handlers
+        _queryTextScrollBar.ChangedPosition += () => {
+            _queryTextView.TopRow = _queryTextScrollBar.Position;
+            if (_queryTextView.TopRow != _queryTextScrollBar.Position) {
+                _queryTextScrollBar.Position = _queryTextView.TopRow;
+            }
+            _queryTextView.SetNeedsDisplay();
+        };
+
+        _queryTextView.DrawContent += (e) => {
+            _queryTextScrollBar.Size = _queryTextView.Lines;
+            _queryTextScrollBar.Position = _queryTextView.TopRow;
+            _queryTextScrollBar.Refresh();
+        };
+
+        // Create scrollbar for current query text view
+        _currentQueryScrollBar = new ScrollBarView(_currentQueryTextView, true, false) {
+            X = Pos.Right(_currentQueryTextView),
+            Y = Pos.Top(_currentQueryTextView),
+            Height = Dim.Height(_currentQueryTextView)
+        };
+
+        // Set up current query scrollbar event handlers
+        _currentQueryScrollBar.ChangedPosition += () => {
+            _currentQueryTextView.TopRow = _currentQueryScrollBar.Position;
+            if (_currentQueryTextView.TopRow != _currentQueryScrollBar.Position) {
+                _currentQueryScrollBar.Position = _currentQueryTextView.TopRow;
+            }
+            _currentQueryTextView.SetNeedsDisplay();
+        };
+
+        _currentQueryTextView.DrawContent += (e) => {
+            _currentQueryScrollBar.Size = _currentQueryTextView.Lines;
+            _currentQueryScrollBar.Position = _currentQueryTextView.TopRow;
+            _currentQueryScrollBar.Refresh();
+        };
+
+        // Add all scrollbars
+        Add(_sessionListScrollBar, _queryTextScrollBar, _currentQueryScrollBar);
+    }
+
+    private void SetupLayout() {
+        X = 0;
+        Y = 0;
+        Width = Dim.Fill();
+        Height = Dim.Fill();
+    }
+
+    private void SetupEventHandlers() {
+        // Handle session selection
+        _sessionListView.SelectedItemChanged += OnSessionSelected;
+
+        // Handle key events
+        KeyPress += OnKeyPress;
+
+        // Set up global key handler at the application level
+        Application.RootKeyEvent = (keyEvent) => {
+            switch (keyEvent.Key) {
+                case Key.w:
+                case Key.W:
+                    _currentDisplayMode = DisplayMode.WaitInformation;
+                    UpdateSessionDisplay();
+                    UpdateStatusLabel();
+                    return true;
+                case Key.s:
+                case Key.S:
+                    _currentDisplayMode = DisplayMode.SessionDetails;
+                    UpdateSessionDisplay();
+                    UpdateStatusLabel();
+                    return true;
+                case Key.F5:
+                    RefreshSessions();
+                    return true;
+            }
+            return false;
+        };
+    }
+
+    private void OnSessionSelected(ListViewItemEventArgs args) {
+        if (args.Item >= 0 && args.Item < _sessions.Count) {
+            UpdateSessionDisplay();
+        }
+    }
+
+    private void UpdateSessionDisplay() {
+        var selectedIndex = _sessionListView.SelectedItem;
+        if (selectedIndex >= 0 && selectedIndex < _sessions.Count) {
+            var session = _sessions[selectedIndex];
+
+            // Update session details based on current mode
+            switch (_currentDisplayMode) {
+                case DisplayMode.SessionDetails:
+                    _queryTextView.Text = session.GetSessionDetails();
+                    break;
+                case DisplayMode.WaitInformation:
+                    _queryTextView.Text = session.GetWaitInformation();
+                    break;
+            }
+
+            // Always update the current query in the separate view
+            _currentQueryTextView.Text = string.IsNullOrWhiteSpace(session.CurrentQuery)
+                ? "No active query"
+                : session.CurrentQuery;
+
+            // Force refresh to update scrollbars
+            _currentQueryTextView.SetNeedsDisplay();
+            _currentQueryScrollBar.Refresh();
+            _queryTextView.SetNeedsDisplay();
+            _queryTextScrollBar.Refresh();
+        } else {
+            _queryTextView.Text = "No session selected\n\nUse ↑↓ arrows to navigate sessions";
+            _currentQueryTextView.Text = "Select a session to view its current query";
+        }
+    }
+
+    private void OnKeyPress(KeyEventEventArgs keyEvent) {
+        switch (keyEvent.KeyEvent.Key) {
+            case Key.Enter:
+                RefreshSessions();
+                keyEvent.Handled = true;
+                break;
+            case Key.q:
+            case Key.Q:
+                Application.RequestStop();
+                keyEvent.Handled = true;
+                break;
+        }
+    }
+
+    private void UpdateStatusLabel() {
+        var modeText = _currentDisplayMode == DisplayMode.WaitInformation ? "Wait Info" : "Session Details";
+        _statusLabel.Text = $"[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [Q] Quit | Mode: {modeText}";
+
+        // Update the query label to match the mode
+        _queryLabel.Text = _currentDisplayMode == DisplayMode.WaitInformation ? "Selected Wait Information:" : "Selected Session Details:";
+    }
+
+    public void RefreshSessions() {
+        try {
+            _statusLabel.Text = "Refreshing...";
+            Application.Refresh();
+
+            // Store current selection info BEFORE refresh
+            int? selectedSessionPid = null;
+            int previousSelectedIndex = _sessionListView.SelectedItem;
+
+            if (previousSelectedIndex >= 0 && previousSelectedIndex < _sessions.Count) {
+                // Use PID as unique identifier for the session
+                selectedSessionPid = _sessions[previousSelectedIndex].Pid;
+            }
+
+            // Refresh the data
+            _sessions = _postgresService.GetActiveSessions();
+
+            var sessionTexts = _sessions.Select(s => s.DisplayText).ToList();
+            _sessionListView.SetSource(sessionTexts);
+
+            _sessionCountLabel.Text = $"Active Sessions ({_sessions.Count}):";
+            UpdateStatusLabel();
+
+            // Restore selection or default to top session
+            int newSelectedIndex = 0; // Default to top session
+
+            if (selectedSessionPid.HasValue && _sessions.Count > 0) {
+                // Try to find the same session by PID
+                var matchingSessionIndex = _sessions.FindIndex(s => s.Pid == selectedSessionPid.Value);
+
+                if (matchingSessionIndex >= 0) {
+                    newSelectedIndex = matchingSessionIndex;
+                }
+                // If not found, newSelectedIndex remains 0 (top session)
+            }
+
+            // Set the selection and update display
+            if (_sessions.Count > 0) {
+                _sessionListView.SelectedItem = newSelectedIndex;
+                UpdateSessionDisplay();
+            } else {
+                _queryTextView.Text = "No active sessions found";
+                _currentQueryTextView.Text = "No sessions available";
+            }
+        } catch (Exception ex) {
+            _statusLabel.Text = $"❌ Error: {ex.Message}";
+            _queryTextView.Text = $"❌ Failed to refresh sessions\n\n" +
+                                 $"Error Details:\n{ex.Message}\n\n" +
+                                 $"Possible causes:\n" +
+                                 $"• Database connection lost\n" +
+                                 $"• Network connectivity issues\n" +
+                                 $"• PostgreSQL server stopped\n" +
+                                 $"• Insufficient permissions\n\n" +
+                                 $"Press [Enter] to retry connection";
+            _currentQueryTextView.Text = "Error occurred - no query data available";
+        }
+
+        Application.Refresh();
+    }
+
+    public void Initialize() {
+        // Load initial data synchronously
+        RefreshSessions();
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch DbOps (External Terminal)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/DbOps/bin/Debug/net8.0/DbOps.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/DbOps",
+            "console": "externalTerminal",
+            "stopAtEntry": false,
+            "preLaunchTask": "build"
+        }
+    ]
+}
