@@ -61,6 +61,9 @@ public class MainWindow : Window {
             TabStop = true
         };
 
+        // Initialize with empty source to prevent null reference exceptions
+        _sessionListView.SetSource(new List<string>());
+
         // Set up color scheme - yellow background highlighting for selected items
         _sessionListView.ColorScheme = new ColorScheme {
             Normal = Application.Driver.MakeAttribute(Color.White, Color.Black), // Non-selected items
@@ -130,9 +133,11 @@ public class MainWindow : Window {
         };
 
         _sessionListView.DrawContent += (e) => {
-            _sessionListScrollBar.Size = _sessionListView.Source.Count;
-            _sessionListScrollBar.Position = _sessionListView.TopItem;
-            _sessionListScrollBar.Refresh();
+            if (_sessionListView.Source != null) {
+                _sessionListScrollBar.Size = _sessionListView.Source.Count;
+                _sessionListScrollBar.Position = _sessionListView.TopItem;
+                _sessionListScrollBar.Refresh();
+            }
         };
 
         // Create scrollbar for query text view
@@ -152,9 +157,11 @@ public class MainWindow : Window {
         };
 
         _queryTextView.DrawContent += (e) => {
-            _queryTextScrollBar.Size = _queryTextView.Lines;
-            _queryTextScrollBar.Position = _queryTextView.TopRow;
-            _queryTextScrollBar.Refresh();
+            if (_queryTextView.Text != null) {
+                _queryTextScrollBar.Size = _queryTextView.Lines;
+                _queryTextScrollBar.Position = _queryTextView.TopRow;
+                _queryTextScrollBar.Refresh();
+            }
         };
 
         // Create scrollbar for current query text view
@@ -174,9 +181,11 @@ public class MainWindow : Window {
         };
 
         _currentQueryTextView.DrawContent += (e) => {
-            _currentQueryScrollBar.Size = _currentQueryTextView.Lines;
-            _currentQueryScrollBar.Position = _currentQueryTextView.TopRow;
-            _currentQueryScrollBar.Refresh();
+            if (_currentQueryTextView.Text != null) {
+                _currentQueryScrollBar.Size = _currentQueryTextView.Lines;
+                _currentQueryScrollBar.Position = _currentQueryTextView.TopRow;
+                _currentQueryScrollBar.Refresh();
+            }
         };
 
         // Add all scrollbars
@@ -315,12 +324,27 @@ public class MainWindow : Window {
 
     private void UpdateStatusLabel() {
         var modeText = _currentDisplayMode switch {
-            DisplayMode.WaitInformation => "Wait Info",
-            DisplayMode.LockingInformation => "Locking Info",
-            _ => "Session Details"
+            DisplayMode.WaitInformation => "Wait",
+            DisplayMode.LockingInformation => "Lock",
+            _ => "Session"
         };
 
-        _statusLabel.Text = $"[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [L] Locking Info | [Q] Quit | Mode: {modeText}";
+        // Get terminal width and create responsive status text
+        int terminalWidth = Application.Driver?.Cols ?? 120;
+
+        string statusText;
+        if (terminalWidth < 80) {
+            // Very compact for narrow terminals
+            statusText = $"↑↓ Nav | Enter Refresh | W/S/L Mode | Q Quit | {modeText}";
+        } else if (terminalWidth < 100) {
+            // Compact for medium terminals
+            statusText = $"[↑↓] Nav | [Enter] Refresh | [W/S/L] Mode | [Q] Quit | Mode: {modeText}";
+        } else {
+            // Full text for wide terminals
+            statusText = $"[↑↓] Navigate | [Enter] Refresh | [W] Wait | [S] Session | [L] Lock | [Q] Quit | Mode: {modeText}";
+        }
+
+        _statusLabel.Text = statusText;
 
         // Update the query label to match the mode
         _queryLabel.Text = _currentDisplayMode switch {
@@ -367,6 +391,9 @@ public class MainWindow : Window {
     private void UpdateDisplayForTerminalSize() {
         // Update header for current terminal size
         _sessionHeaderLabel.Text = GenerateHeader();
+
+        // Update status label for current terminal size
+        UpdateStatusLabel();
 
         // Refresh session display with new widths
         RefreshSessionDisplay();
