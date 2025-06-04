@@ -41,12 +41,12 @@ public class MainWindow : Window {
             Y = 3
         };
 
-        // Session list view - across the top, horizontal layout
+        // Session list view - across the top, horizontal layout (full width)
         _sessionListView = new ListView() {
             X = 1,
             Y = 4,
-            Width = Dim.Fill() - 2,  // Standard padding for scrollbar
-            Height = Dim.Percent(15),
+            Width = Dim.Fill() - 1,  // Use full width minus just the right border
+            Height = Dim.Percent(25),
             CanFocus = true
         };
 
@@ -181,12 +181,15 @@ public class MainWindow : Window {
         // Set up global key handler at the application level
         Application.RootKeyEvent = (keyEvent) => {
             switch (keyEvent.Key) {
+                case Key.q:
+                case Key.Q:
+                    PromptToQuit();
+                    return true;
                 case Key.w:
                 case Key.W:
                     _currentDisplayMode = DisplayMode.WaitInformation;
                     UpdateSessionDisplay();
                     UpdateStatusLabel();
-
                     return true;
                 case Key.s:
                 case Key.S:
@@ -269,12 +272,18 @@ public class MainWindow : Window {
                 RefreshSessions();
                 keyEvent.Handled = true;
                 break;
-            case Key.q:
-            case Key.Q:
-                Application.RequestStop();
-                keyEvent.Handled = true;
-                break;
         }
+    }
+
+    private void PromptToQuit() {
+        var result = MessageBox.Query("Quit Application",
+            "Are you sure you want to quit the PostgreSQL Database Monitor?",
+            "Yes", "No");
+
+        if (result == 0) { // User clicked "Yes"
+            Application.RequestStop();
+        }
+        // If result == 1 (No) or dialog was cancelled, do nothing
     }
 
     private void UpdateStatusLabel() {
@@ -299,9 +308,10 @@ public class MainWindow : Window {
             _statusLabel.Text = "Refreshing...";
             Application.Refresh();
 
-            // Store current selection info BEFORE refresh
+            // Store current selection and scroll position BEFORE refresh
             int? selectedSessionPid = null;
             int previousSelectedIndex = _sessionListView.SelectedItem;
+            int previousTopItem = _sessionListView.TopItem;
 
             if (previousSelectedIndex >= 0 && previousSelectedIndex < _sessions.Count) {
                 // Use PID as unique identifier for the session
@@ -330,9 +340,18 @@ public class MainWindow : Window {
                 // If not found, newSelectedIndex remains 0 (top session)
             }
 
-            // Set the selection and update display
+            // Set the selection and restore scroll position
             if (_sessions.Count > 0) {
                 _sessionListView.SelectedItem = newSelectedIndex;
+
+                // Restore scroll position if possible
+                if (previousTopItem < _sessions.Count) {
+                    _sessionListView.TopItem = previousTopItem;
+                } else if (_sessions.Count > 0) {
+                    // If previous scroll position is beyond new list, scroll to show selected item
+                    _sessionListView.TopItem = Math.Max(0, newSelectedIndex - 5);
+                }
+
                 UpdateSessionDisplay();
             } else {
                 _queryTextView.Text = "No active sessions found";

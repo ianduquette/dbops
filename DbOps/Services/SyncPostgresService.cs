@@ -162,4 +162,22 @@ public class SyncPostgresService {
         var builder = new NpgsqlConnectionStringBuilder(_connectionString);
         return $"{builder.Host}:{builder.Port}/{builder.Database}";
     }
+
+    public int GetTrackActivityQuerySize() {
+        try {
+            using var connection = new NpgsqlConnection(_connectionString);
+            connection.Open();
+
+            using var command = new NpgsqlCommand(PostgresQueries.GetTrackActivityQuerySize, connection);
+            command.CommandTimeout = 10;
+            var result = command.ExecuteScalar();
+
+            if (result != null && int.TryParse(result.ToString(), out int size)) {
+                return size;
+            }
+            return -1; // Unknown
+        } catch {
+            return -1; // Error
+        }
+    }
 }

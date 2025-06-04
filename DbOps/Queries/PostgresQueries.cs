@@ -9,7 +9,7 @@ public static class PostgresQueries {
             application_name,
             client_addr,
             state,
-            query,
+            COALESCE(query, '') as query,
             query_start,
             wait_event_type,
             wait_event,
@@ -23,6 +23,12 @@ public static class PostgresQueries {
         ORDER BY datname, application_name, query_start;";
 
     public const string TestConnection = @"SELECT version();";
+
+    public const string GetTrackActivityQuerySize = @"SHOW track_activity_query_size;";
+
+    public const string SetTrackActivityQuerySize = @"
+        -- Temporarily increase query tracking size for this session
+        SET track_activity_query_size = 8192;";
 
     public const string GetSessionLocks = @"
         SELECT

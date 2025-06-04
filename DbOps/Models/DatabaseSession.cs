@@ -26,9 +26,9 @@ public class DatabaseSession {
             // Truncate long application names and database names to prevent scroll bar shifting
             var dbName = DatabaseName.Length > 15 ? DatabaseName[..12] + "..." : DatabaseName;
             var appName = ApplicationName.Length > 25 ? ApplicationName[..22] + "..." : ApplicationName;
-            var stateText = State.Length > 12 ? State[..9] + "..." : State;
+            var stateText = State.Length > 30 ? State[..27] + "..." : State;
 
-            return $"[{dbName,-15}] {appName,-25} - PID: {Pid,6} - State: {stateText,-12}";
+            return $"[{dbName,-15}] {appName,-25} - PID: {Pid,6} - State: {stateText,-30}";
         }
     }
 
