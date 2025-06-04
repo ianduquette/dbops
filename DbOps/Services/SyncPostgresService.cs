@@ -75,6 +75,89 @@ public class SyncPostgresService {
         return sessions;
     }
 
+    public List<DatabaseLock> GetSessionLocks(int pid) {
+        var locks = new List<DatabaseLock>();
+
+        try {
+            using var connection = new NpgsqlConnection(_connectionString);
+            connection.Open();
+
+            using var command = new NpgsqlCommand(PostgresQueries.GetSessionLocks, connection);
+            command.Parameters.AddWithValue("@pid", pid);
+            command.CommandTimeout = 10;
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read()) {
+                var lockItem = new DatabaseLock {
+                    LockType = reader.IsDBNull(0) ? "" : reader.GetString(0),
+                    Mode = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    Granted = !reader.IsDBNull(2) && reader.GetBoolean(2),
+                    RelationName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    Page = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                    Tuple = reader.IsDBNull(5) ? null : reader.GetInt16(5),
+                    VirtualXid = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    TransactionId = reader.IsDBNull(7) ? null : (uint)reader.GetInt64(7),
+                    ClassId = reader.IsDBNull(8) ? null : (uint)reader.GetInt64(8),
+                    ObjId = reader.IsDBNull(9) ? null : (uint)reader.GetInt64(9),
+                    ObjSubId = reader.IsDBNull(10) ? null : reader.GetInt16(10)
+                };
+
+                locks.Add(lockItem);
+            }
+        } catch (Exception ex) {
+            throw new InvalidOperationException($"Failed to retrieve locks for PID {pid}: {ex.Message}", ex);
+        }
+
+        return locks;
+    }
+
+    public List<BlockingRelationship> GetBlockingRelationships(int pid) {
+        var relationships = new List<BlockingRelationship>();
+
+        try {
+            using var connection = new NpgsqlConnection(_connectionString);
+            connection.Open();
+
+            using var command = new NpgsqlCommand(PostgresQueries.GetBlockingRelationships, connection);
+            command.Parameters.AddWithValue("@pid", pid);
+            command.CommandTimeout = 10;
+            using var reader = command.ExecuteReader();
+
+            while (reader.Read()) {
+                var relationship = new BlockingRelationship {
+                    BlockedPid = reader.GetInt32(0),
+                    BlockedUser = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    BlockedApp = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    BlockingPid = reader.GetInt32(3),
+                    BlockingUser = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    BlockingApp = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                    LockType = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    RequestedMode = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    HeldMode = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                    RelationName = reader.IsDBNull(9) ? "" : reader.GetString(9)
+                };
+
+                relationships.Add(relationship);
+            }
+        } catch (Exception ex) {
+            throw new InvalidOperationException($"Failed to retrieve blocking relationships for PID {pid}: {ex.Message}", ex);
+        }
+
+        return relationships;
+    }
+
+    public void LoadLockingInformation(DatabaseSession session) {
+        try {
+            session.Locks = GetSessionLocks(session.Pid);
+            session.BlockingRelationships = GetBlockingRelationships(session.Pid);
+        } catch (Exception ex) {
+            // Log error but don't fail the entire operation
+            session.Locks = new List<DatabaseLock>();
+            session.BlockingRelationships = new List<BlockingRelationship>();
+            throw new InvalidOperationException($"Failed to load locking information for session {session.Pid}: {ex.Message}", ex);
+        }
+    }
+
     public string GetConnectionInfo() {
         var builder = new NpgsqlConnectionStringBuilder(_connectionString);
         return $"{builder.Host}:{builder.Port}/{builder.Database}";

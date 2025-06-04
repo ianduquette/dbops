@@ -17,7 +17,20 @@ public class DatabaseSession {
     public DateTime? BackendStart { get; set; }
     public DateTime? TransactionStart { get; set; }
 
-    public string DisplayText => $"[{DatabaseName}] {ApplicationName} - PID: {Pid} - State: {State}";
+    // Locking information properties
+    public List<DatabaseLock> Locks { get; set; } = new();
+    public List<BlockingRelationship> BlockingRelationships { get; set; } = new();
+
+    public string DisplayText {
+        get {
+            // Truncate long application names and database names to prevent scroll bar shifting
+            var dbName = DatabaseName.Length > 15 ? DatabaseName[..12] + "..." : DatabaseName;
+            var appName = ApplicationName.Length > 25 ? ApplicationName[..22] + "..." : ApplicationName;
+            var stateText = State.Length > 12 ? State[..9] + "..." : State;
+
+            return $"[{dbName,-15}] {appName,-25} - PID: {Pid,6} - State: {stateText,-12}";
+        }
+    }
 
     public string TruncatedQuery => CurrentQuery.Length > 80
         ? CurrentQuery[..77] + "..."
@@ -66,6 +79,56 @@ public class DatabaseSession {
         }
 
         return waitInfo;
+    }
+
+    public string GetLockingInformation() {
+        var lockInfo = "Locking Information:\n";
+        lockInfo += $"Session PID: {Pid} | Database: {DatabaseName} | Application: {ApplicationName}\n";
+        lockInfo += new string('═', 50) + "\n\n";
+
+        // Check for blocking relationships FIRST - show at top
+        var blockingOthers = BlockingRelationships.Where(br => br.BlockingPid == Pid).ToList();
+        var blockedByOthers = BlockingRelationships.Where(br => br.BlockedPid == Pid).ToList();
+
+        // Show blocking status prominently at the top
+        if (blockingOthers.Count > 0) {
+            lockInfo += $"[!] BLOCKING STATUS - CRITICAL:\n";
+            lockInfo += $"[X] This session is BLOCKING {blockingOthers.Count} other session(s):\n";
+            foreach (var blocking in blockingOthers) {
+                lockInfo += $"   * {blocking.GetBlockedDescription()}\n";
+            }
+            lockInfo += "\n";
+        }
+
+        if (blockedByOthers.Count > 0) {
+            lockInfo += $"[~] BLOCKED STATUS - WAITING:\n";
+            lockInfo += $"[X] This session is BLOCKED by {blockedByOthers.Count} other session(s):\n";
+            foreach (var blocked in blockedByOthers) {
+                lockInfo += $"   * {blocked.GetBlockingDescription()}\n";
+            }
+            lockInfo += "\n";
+        }
+
+        if (blockingOthers.Count == 0 && blockedByOthers.Count == 0) {
+            lockInfo += "[OK] BLOCKING STATUS: No blocking relationships detected.\n\n";
+        }
+
+        // Add separator before detailed lock information
+        lockInfo += new string('─', 40) + "\n";
+        lockInfo += "DETAILED LOCK INFORMATION:\n";
+        lockInfo += new string('─', 40) + "\n";
+
+        if (Locks.Count == 0) {
+            lockInfo += "No locks held by this session.\n";
+        } else {
+            lockInfo += $"Locks Held/Requested ({Locks.Count}):\n\n";
+
+            foreach (var lockItem in Locks) {
+                lockInfo += $"{lockItem.GetDisplayText()}\n";
+            }
+        }
+
+        return lockInfo;
     }
 
     private static string FormatDuration(TimeSpan duration) {

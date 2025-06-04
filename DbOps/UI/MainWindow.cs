@@ -18,7 +18,7 @@ public class MainWindow : Window {
     private ScrollBarView _currentQueryScrollBar = null!;
     private Label _statusLabel = null!;
     private List<DatabaseSession> _sessions = new();
-    private enum DisplayMode { SessionDetails, WaitInformation }
+    private enum DisplayMode { SessionDetails, WaitInformation, LockingInformation }
     private DisplayMode _currentDisplayMode = DisplayMode.SessionDetails;
 
     public MainWindow(SyncPostgresService postgresService) : base("PostgreSQL Database Monitor") {
@@ -45,7 +45,7 @@ public class MainWindow : Window {
         _sessionListView = new ListView() {
             X = 1,
             Y = 4,
-            Width = Dim.Fill() - 2,  // Leave space for scrollbar
+            Width = Dim.Fill() - 2,  // Standard padding for scrollbar
             Height = Dim.Percent(15),
             CanFocus = true
         };
@@ -60,7 +60,7 @@ public class MainWindow : Window {
         _queryTextView = new TextView() {
             X = 1,
             Y = Pos.Bottom(_queryLabel),
-            Width = Dim.Percent(50) - 2,  // Leave space for scrollbar
+            Width = Dim.Percent(50) - 2,  // Standard padding for scrollbar
             Height = Dim.Fill() - 3,
             ReadOnly = true,
             Text = "No session selected\n\nUse ↑↓ arrows to navigate sessions",
@@ -69,15 +69,15 @@ public class MainWindow : Window {
 
         // Current Query label - bottom right
         var currentQueryLabel = new Label("Current Query:") {
-            X = Pos.Right(_queryTextView) + 1,
+            X = Pos.Right(_queryTextView) + 3,  // Increased spacing to prevent blending
             Y = Pos.Bottom(_sessionListView) + 1
         };
 
         // Current Query view - bottom right half
         _currentQueryTextView = new TextView() {
-            X = Pos.Right(_queryTextView) + 1,
+            X = Pos.Right(_queryTextView) + 3,  // Increased spacing to prevent blending
             Y = Pos.Bottom(currentQueryLabel),
-            Width = Dim.Fill() - 2,  // Leave space for scrollbar
+            Width = Dim.Fill() - 2,  // Standard padding for scrollbar
             Height = Dim.Fill() - 3,
             ReadOnly = true,
             Text = "Select a session to view its current query",
@@ -85,7 +85,7 @@ public class MainWindow : Window {
         };
 
         // Status label
-        _statusLabel = new Label("[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [Q] Quit | Mode: Session Details") {
+        _statusLabel = new Label("[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [L] Locking Info | [Q] Quit | Mode: Session Details") {
             X = 1,
             Y = Pos.AnchorEnd(1)
         };
@@ -186,10 +186,17 @@ public class MainWindow : Window {
                     _currentDisplayMode = DisplayMode.WaitInformation;
                     UpdateSessionDisplay();
                     UpdateStatusLabel();
+
                     return true;
                 case Key.s:
                 case Key.S:
                     _currentDisplayMode = DisplayMode.SessionDetails;
+                    UpdateSessionDisplay();
+                    UpdateStatusLabel();
+                    return true;
+                case Key.l:
+                case Key.L:
+                    _currentDisplayMode = DisplayMode.LockingInformation;
                     UpdateSessionDisplay();
                     UpdateStatusLabel();
                     return true;
@@ -219,6 +226,24 @@ public class MainWindow : Window {
                     break;
                 case DisplayMode.WaitInformation:
                     _queryTextView.Text = session.GetWaitInformation();
+                    break;
+                case DisplayMode.LockingInformation:
+                    try {
+                        _queryTextView.Text = "Loading locking information...";
+                        Application.Refresh();
+
+                        // Load locking information for the selected session
+                        _postgresService.LoadLockingInformation(session);
+                        _queryTextView.Text = session.GetLockingInformation();
+                    } catch (Exception ex) {
+                        _queryTextView.Text = $"❌ Failed to load locking information\n\n" +
+                                             $"Error: {ex.Message}\n\n" +
+                                             $"This could be due to:\n" +
+                                             $"• Insufficient database permissions\n" +
+                                             $"• Connection issues\n" +
+                                             $"• PostgreSQL version compatibility\n\n" +
+                                             $"Try switching to another view mode.";
+                    }
                     break;
             }
 
@@ -253,11 +278,20 @@ public class MainWindow : Window {
     }
 
     private void UpdateStatusLabel() {
-        var modeText = _currentDisplayMode == DisplayMode.WaitInformation ? "Wait Info" : "Session Details";
-        _statusLabel.Text = $"[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [Q] Quit | Mode: {modeText}";
+        var modeText = _currentDisplayMode switch {
+            DisplayMode.WaitInformation => "Wait Info",
+            DisplayMode.LockingInformation => "Locking Info",
+            _ => "Session Details"
+        };
+
+        _statusLabel.Text = $"[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [L] Locking Info | [Q] Quit | Mode: {modeText}";
 
         // Update the query label to match the mode
-        _queryLabel.Text = _currentDisplayMode == DisplayMode.WaitInformation ? "Selected Wait Information:" : "Selected Session Details:";
+        _queryLabel.Text = _currentDisplayMode switch {
+            DisplayMode.WaitInformation => "Selected Wait Information:",
+            DisplayMode.LockingInformation => "Selected Locking Information:",
+            _ => "Selected Session Details:"
+        };
     }
 
     public void RefreshSessions() {
