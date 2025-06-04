@@ -1,7 +1,6 @@
 namespace DbOps.Models;
 
-public class DatabaseSession
-{
+public class DatabaseSession {
     public int Pid { get; set; }
     public string DatabaseName { get; set; } = string.Empty;
     public string ApplicationName { get; set; } = string.Empty;
@@ -29,26 +28,20 @@ public class DatabaseSession
 
     // Computed properties for requirements mapping
     public string Machine => !string.IsNullOrEmpty(ClientHostname) ? ClientHostname : ClientAddress;
-    public string OSUser => "N/A"; // PostgreSQL doesn't provide OS user information
     public string Server => ServerName;
     public int SID => Pid; // Use PID as Session ID equivalent
-    public string Terminal => "N/A"; // PostgreSQL doesn't provide terminal information
     public string Type => DetermineSessionType();
 
-    public string DisplayText
-    {
-        get
-        {
+    public string DisplayText {
+        get {
             // Use default widths for backward compatibility
             return GetDisplayText(120); // Default to normal width
         }
     }
 
-    public string GetDisplayText(int terminalWidth)
-    {
+    public string GetDisplayText(int terminalWidth) {
         var widths = ColumnWidths.CalculateWidths(terminalWidth);
-        if (widths == null)
-        {
+        if (widths == null) {
             // Terminal too small - show minimal info
             return $"[{DatabaseName[..Math.Min(6, DatabaseName.Length)]}] PID:{Pid}";
         }
@@ -87,17 +80,14 @@ public class DatabaseSession
         ? CurrentQuery[..77] + "..."
         : CurrentQuery;
 
-    public string GetSessionDetails()
-    {
+    public string GetSessionDetails() {
         return $"Session Information:\n" +
                $"PID (SID): {Pid}\n" +
                $"Database: {DatabaseName}\n" +
                $"Program: {ApplicationName}\n" +
                $"Machine: {Machine}\n" +
-               $"OS User: {OSUser}\n" +
                $"Server: {Server}\n" +
                $"Status: {State}\n" +
-               $"Terminal: {Terminal}\n" +
                $"Type: {Type}\n" +
                $"Username: {Username}\n" +
                $"Query Start: {QueryStart?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A"}\n" +
@@ -108,48 +98,37 @@ public class DatabaseSession
                (BackendStart.HasValue ? $"Session Duration: {FormatDuration(DateTime.Now - BackendStart.Value)}" : "");
     }
 
-    public string GetWaitInformation()
-    {
+    public string GetWaitInformation() {
         var waitInfo = "Wait Information:\n";
         waitInfo += $"Event Type: {WaitEventType ?? "None"}\n";
         waitInfo += $"Event Name: {WaitEvent ?? "Not Waiting"}\n";
         waitInfo += $"Current State: {State}\n";
 
-        if (StateChange.HasValue)
-        {
+        if (StateChange.HasValue) {
             var timeInState = DateTime.Now - StateChange.Value;
             waitInfo += $"Time in Current State: {FormatDuration(timeInState)}\n";
-        }
-        else
-        {
+        } else {
             waitInfo += "Time in Current State: N/A\n";
         }
 
-        if (BackendStart.HasValue)
-        {
+        if (BackendStart.HasValue) {
             var sessionDuration = DateTime.Now - BackendStart.Value;
             waitInfo += $"Session Duration: {FormatDuration(sessionDuration)}\n";
-        }
-        else
-        {
+        } else {
             waitInfo += "Session Duration: N/A\n";
         }
 
-        if (TransactionStart.HasValue)
-        {
+        if (TransactionStart.HasValue) {
             var transactionDuration = DateTime.Now - TransactionStart.Value;
             waitInfo += $"Transaction Duration: {FormatDuration(transactionDuration)}\n";
-        }
-        else
-        {
+        } else {
             waitInfo += "Transaction Duration: N/A\n";
         }
 
         return waitInfo;
     }
 
-    public string GetLockingInformation()
-    {
+    public string GetLockingInformation() {
         var lockInfo = "Locking Information:\n";
         lockInfo += $"Session PID: {Pid} | Database: {DatabaseName} | Application: {ApplicationName}\n";
         lockInfo += new string('═', 50) + "\n\n";
@@ -159,30 +138,25 @@ public class DatabaseSession
         var blockedByOthers = BlockingRelationships.Where(br => br.BlockedPid == Pid).ToList();
 
         // Show blocking status prominently at the top
-        if (blockingOthers.Count > 0)
-        {
+        if (blockingOthers.Count > 0) {
             lockInfo += $"[!] BLOCKING STATUS - CRITICAL:\n";
             lockInfo += $"[X] This session is BLOCKING {blockingOthers.Count} other session(s):\n";
-            foreach (var blocking in blockingOthers)
-            {
+            foreach (var blocking in blockingOthers) {
                 lockInfo += $"   * {blocking.GetBlockedDescription()}\n";
             }
             lockInfo += "\n";
         }
 
-        if (blockedByOthers.Count > 0)
-        {
+        if (blockedByOthers.Count > 0) {
             lockInfo += $"[~] BLOCKED STATUS - WAITING:\n";
             lockInfo += $"[X] This session is BLOCKED by {blockedByOthers.Count} other session(s):\n";
-            foreach (var blocked in blockedByOthers)
-            {
+            foreach (var blocked in blockedByOthers) {
                 lockInfo += $"   * {blocked.GetBlockingDescription()}\n";
             }
             lockInfo += "\n";
         }
 
-        if (blockingOthers.Count == 0 && blockedByOthers.Count == 0)
-        {
+        if (blockingOthers.Count == 0 && blockedByOthers.Count == 0) {
             lockInfo += "[OK] BLOCKING STATUS: No blocking relationships detected.\n\n";
         }
 
@@ -191,16 +165,12 @@ public class DatabaseSession
         lockInfo += "DETAILED LOCK INFORMATION:\n";
         lockInfo += new string('─', 40) + "\n";
 
-        if (Locks.Count == 0)
-        {
+        if (Locks.Count == 0) {
             lockInfo += "No locks held by this session.\n";
-        }
-        else
-        {
+        } else {
             lockInfo += $"Locks Held/Requested ({Locks.Count}):\n\n";
 
-            foreach (var lockItem in Locks)
-            {
+            foreach (var lockItem in Locks) {
                 lockInfo += $"{lockItem.GetDisplayText()}\n";
             }
         }
@@ -208,10 +178,8 @@ public class DatabaseSession
         return lockInfo;
     }
 
-    private string DetermineSessionType()
-    {
-        if (string.IsNullOrEmpty(ApplicationName))
-        {
+    private string DetermineSessionType() {
+        if (string.IsNullOrEmpty(ApplicationName)) {
             return "Unknown";
         }
 
@@ -229,23 +197,15 @@ public class DatabaseSession
         return "Application";
     }
 
-    private static string FormatDuration(TimeSpan duration)
-    {
-        if (duration.TotalDays >= 1)
-        {
+    private static string FormatDuration(TimeSpan duration) {
+        if (duration.TotalDays >= 1) {
 
             return $"{duration.Days}d {duration.Hours}h {duration.Minutes}m {duration.Seconds}s";
-        }
-        else if (duration.TotalHours >= 1)
-        {
+        } else if (duration.TotalHours >= 1) {
             return $"{duration.Hours}h {duration.Minutes}m {duration.Seconds}s";
-        }
-        else if (duration.TotalMinutes >= 1)
-        {
+        } else if (duration.TotalMinutes >= 1) {
             return $"{duration.Minutes}m {duration.Seconds}s";
-        }
-        else
-        {
+        } else {
             return $"{duration.TotalSeconds:F1}s";
         }
     }
