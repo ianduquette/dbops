@@ -1,11 +1,14 @@
 using DbOps.Models;
 using DbOps.Services;
+using DbOps.UI.Components;
 using Terminal.Gui;
 
 namespace DbOps.UI;
 
 public class MainWindow : Window {
     private readonly SyncPostgresService _postgresService;
+    private readonly DisplayModeManager _displayModeManager;
+    private readonly KeyboardHandler _keyboardHandler;
     private ListView _sessionListView = null!;
     private ScrollBarView _sessionListScrollBar = null!;
 
@@ -17,13 +20,14 @@ public class MainWindow : Window {
     private ScrollBarView _queryTextScrollBar = null!;
     private TextView _currentQueryTextView = null!;
     private ScrollBarView _currentQueryScrollBar = null!;
-    private Label _statusLabel = null!;
+    private StatusBarComponent _statusBar = null!;
     private List<DatabaseSession> _sessions = new();
-    private enum DisplayMode { SessionDetails, WaitInformation, LockingInformation }
-    private DisplayMode _currentDisplayMode = DisplayMode.SessionDetails;
 
     public MainWindow(SyncPostgresService postgresService) : base("PostgreSQL Database Monitor") {
         _postgresService = postgresService;
+        _displayModeManager = new DisplayModeManager(postgresService);
+        _keyboardHandler = new KeyboardHandler();
+
         InitializeComponents();
         SetupLayout();
         SetupEventHandlers();
@@ -106,15 +110,12 @@ public class MainWindow : Window {
             WordWrap = true
         };
 
-        // Status label
-        _statusLabel = new Label("[↑↓] Navigate | [Enter] Refresh | [W] Wait Info | [S] Session Details | [L] Locking Info | [Q] Quit | Mode: Session Details") {
-            X = 1,
-            Y = Pos.AnchorEnd(1)
-        };
+        // Status bar component
+        _statusBar = new StatusBarComponent(_keyboardHandler);
 
         // Add all components first
         Add(_connectionLabel, _sessionCountLabel, _sessionHeaderLabel, _sessionListView, _queryLabel,
-            _queryTextView, currentQueryLabel, _currentQueryTextView, _statusLabel);
+            _queryTextView, currentQueryLabel, _currentQueryTextView, _statusBar.StatusLabel);
 
         // Create scrollbar for session list view
         _sessionListScrollBar = new ScrollBarView(_sessionListView, true, false) {
@@ -190,6 +191,10 @@ public class MainWindow : Window {
 
         // Add all scrollbars
         Add(_sessionListScrollBar, _queryTextScrollBar, _currentQueryScrollBar);
+
+        // Add key event handlers to TextViews so custom keys work when they have focus
+        _queryTextView.KeyPress += OnTextViewKeyPress;
+        _currentQueryTextView.KeyPress += OnTextViewKeyPress;
     }
 
     private void SetupLayout() {
@@ -203,43 +208,18 @@ public class MainWindow : Window {
         // Handle session selection
         _sessionListView.SelectedItemChanged += OnSessionSelected;
 
-        // Handle key events
-        KeyPress += OnKeyPress;
+        // Handle display mode changes
+        _displayModeManager.ModeChanged += OnModeChanged;
+
+        // Handle keyboard events through KeyboardHandler
+        _keyboardHandler.QuitRequested += PromptToQuit;
+        _keyboardHandler.RefreshRequested += RefreshSessions;
+        _keyboardHandler.ShowWaitInfoRequested += () => _displayModeManager.SetMode(DisplayModeManager.DisplayMode.WaitInformation);
+        _keyboardHandler.ShowSessionDetailsRequested += () => _displayModeManager.SetMode(DisplayModeManager.DisplayMode.SessionDetails);
+        _keyboardHandler.ShowLockingInfoRequested += () => _displayModeManager.SetMode(DisplayModeManager.DisplayMode.LockingInformation);
 
         // Handle terminal resize
         Application.Resized += OnTerminalResized;
-
-        // Set up global key handler at the application level
-        Application.RootKeyEvent = (keyEvent) => {
-            switch (keyEvent.Key) {
-                case Key.q:
-                case Key.Q:
-                    PromptToQuit();
-                    return true;
-                case Key.w:
-                case Key.W:
-                    _currentDisplayMode = DisplayMode.WaitInformation;
-                    UpdateSessionDisplay();
-                    UpdateStatusLabel();
-                    return true;
-                case Key.s:
-                case Key.S:
-                    _currentDisplayMode = DisplayMode.SessionDetails;
-                    UpdateSessionDisplay();
-                    UpdateStatusLabel();
-                    return true;
-                case Key.l:
-                case Key.L:
-                    _currentDisplayMode = DisplayMode.LockingInformation;
-                    UpdateSessionDisplay();
-                    UpdateStatusLabel();
-                    return true;
-                case Key.F5:
-                    RefreshSessions();
-                    return true;
-            }
-            return false;
-        };
     }
 
     private void OnTerminalResized(Application.ResizedEventArgs args) {
@@ -253,38 +233,24 @@ public class MainWindow : Window {
         }
     }
 
+    private void OnModeChanged() {
+        UpdateSessionDisplay();
+        UpdateStatusLabel();
+    }
+
     private void UpdateSessionDisplay() {
         var selectedIndex = _sessionListView.SelectedItem;
         if (selectedIndex >= 0 && selectedIndex < _sessions.Count) {
             var session = _sessions[selectedIndex];
 
-            // Update session details based on current mode
-            switch (_currentDisplayMode) {
-                case DisplayMode.SessionDetails:
-                    _queryTextView.Text = session.GetSessionDetails();
-                    break;
-                case DisplayMode.WaitInformation:
-                    _queryTextView.Text = session.GetWaitInformation();
-                    break;
-                case DisplayMode.LockingInformation:
-                    try {
-                        _queryTextView.Text = "Loading locking information...";
-                        Application.Refresh();
-
-                        // Load locking information for the selected session
-                        _postgresService.LoadLockingInformation(session);
-                        _queryTextView.Text = session.GetLockingInformation();
-                    } catch (Exception ex) {
-                        _queryTextView.Text = $"❌ Failed to load locking information\n\n" +
-                                             $"Error: {ex.Message}\n\n" +
-                                             $"This could be due to:\n" +
-                                             $"• Insufficient database permissions\n" +
-                                             $"• Connection issues\n" +
-                                             $"• PostgreSQL version compatibility\n\n" +
-                                             $"Try switching to another view mode.";
-                    }
-                    break;
+            // Show loading message for locking information
+            if (_displayModeManager.CurrentMode == DisplayModeManager.DisplayMode.LockingInformation) {
+                _queryTextView.Text = "Loading locking information...";
+                Application.Refresh();
             }
+
+            // Get content from the display mode manager
+            _queryTextView.Text = _displayModeManager.GetDisplayContent(session);
 
             // Always update the current query in the separate view
             _currentQueryTextView.Text = string.IsNullOrWhiteSpace(session.CurrentQuery)
@@ -302,13 +268,28 @@ public class MainWindow : Window {
         }
     }
 
-    private void OnKeyPress(KeyEventEventArgs keyEvent) {
-        switch (keyEvent.KeyEvent.Key) {
-            case Key.Enter:
-                RefreshSessions();
-                keyEvent.Handled = true;
-                break;
+    public override bool ProcessKey(KeyEvent keyEvent) {
+        // First, try to handle the key through our KeyboardHandler
+        if (_keyboardHandler.HandleKeyPress(keyEvent)) {
+            return true; // Key was handled by our custom handler
         }
+
+        // If our handler didn't handle it, let the base class handle it normally
+        // This ensures normal Terminal.Gui functionality (navigation, etc.) still works
+        return base.ProcessKey(keyEvent);
+    }
+
+    private void OnTextViewKeyPress(KeyEventEventArgs keyEvent) {
+        // Handle custom keys when TextViews have focus
+        if (_keyboardHandler.HandleKeyPress(keyEvent.KeyEvent)) {
+            keyEvent.Handled = true;
+        }
+        // If not handled, let the TextView handle it normally
+    }
+
+    private void OnKeyPress(KeyEventEventArgs keyEvent) {
+        // This method is kept for any additional key handling if needed
+        // Currently empty as ProcessKey handles everything
     }
 
     private void PromptToQuit() {
@@ -323,35 +304,11 @@ public class MainWindow : Window {
     }
 
     private void UpdateStatusLabel() {
-        var modeText = _currentDisplayMode switch {
-            DisplayMode.WaitInformation => "Wait",
-            DisplayMode.LockingInformation => "Lock",
-            _ => "Session"
-        };
-
-        // Get terminal width and create responsive status text
-        int terminalWidth = Application.Driver?.Cols ?? 120;
-
-        string statusText;
-        if (terminalWidth < 80) {
-            // Very compact for narrow terminals
-            statusText = $"↑↓ Nav | Enter Refresh | W/S/L Mode | Q Quit | {modeText}";
-        } else if (terminalWidth < 100) {
-            // Compact for medium terminals
-            statusText = $"[↑↓] Nav | [Enter] Refresh | [W/S/L] Mode | [Q] Quit | Mode: {modeText}";
-        } else {
-            // Full text for wide terminals
-            statusText = $"[↑↓] Navigate | [Enter] Refresh | [W] Wait | [S] Session | [L] Lock | [Q] Quit | Mode: {modeText}";
-        }
-
-        _statusLabel.Text = statusText;
+        var modeText = _displayModeManager.GetModeDisplayName();
+        _statusBar.UpdateStatus(modeText);
 
         // Update the query label to match the mode
-        _queryLabel.Text = _currentDisplayMode switch {
-            DisplayMode.WaitInformation => "Selected Wait Information:",
-            DisplayMode.LockingInformation => "Selected Locking Information:",
-            _ => "Selected Session Details:"
-        };
+        _queryLabel.Text = _displayModeManager.GetQueryLabelText();
     }
 
     private string GenerateHeader() {
@@ -409,7 +366,7 @@ public class MainWindow : Window {
 
     public void RefreshSessions() {
         try {
-            _statusLabel.Text = "Refreshing...";
+            _statusBar.SetLoadingStatus("Refreshing...");
             Application.Refresh();
 
             // Store current selection and scroll position BEFORE refresh
@@ -462,7 +419,7 @@ public class MainWindow : Window {
                 _currentQueryTextView.Text = "No sessions available";
             }
         } catch (Exception ex) {
-            _statusLabel.Text = $"❌ Error: {ex.Message}";
+            _statusBar.SetErrorStatus(ex.Message);
             _queryTextView.Text = $"❌ Failed to refresh sessions\n\n" +
                                  $"Error Details:\n{ex.Message}\n\n" +
                                  $"Possible causes:\n" +
