@@ -48,6 +48,27 @@ public class StatusBarComponent {
     }
 
     public void SetErrorStatus(string errorMessage) {
-        StatusLabel.Text = $"❌ Error: {errorMessage}";
+        // Get terminal width and create responsive status text with error
+        int terminalWidth = Application.Driver?.Cols ?? 120;
+
+        // Truncate error message if too long
+        string shortError = errorMessage.Length > 40 ? errorMessage.Substring(0, 37) + "..." : errorMessage;
+
+        string keyText;
+        if (_keyboardHandler != null) {
+            // Use dynamic key mappings from KeyboardHandler
+            keyText = _keyboardHandler.GetStatusBarKeyText(terminalWidth - shortError.Length - 12); // Reserve space for error
+        } else {
+            // Fallback to hardcoded keys with space-aware formatting
+            if (terminalWidth < 80) {
+                keyText = "F5 Refresh | C Connections | Q Quit";
+            } else if (terminalWidth < 120) {
+                keyText = "[F5] Refresh | [C] Connections | [Q] Quit";
+            } else {
+                keyText = "[↑↓] Navigate | [F5] Refresh | [C] Connections | [Q] Quit";
+            }
+        }
+
+        StatusLabel.Text = $"❌ {shortError} | {keyText}";
     }
 }
