@@ -1,5 +1,7 @@
+using DbOps.Models;
 using DbOps.Services;
 using DbOps.UI;
+using DbOps.UI.Dialogs;
 using Terminal.Gui;
 
 namespace DbOps;
@@ -17,19 +19,25 @@ class Program {
     }
 
     static void RunTuiVersion() {
-        // Connection details (hardcoded for MVP)
-        const string host = "127.0.0.1";
-        const int port = 5433;
-        const string database = "postgres";
-        const string username = "postgres";
-        const string password = "cenozon";
-
         try {
-            Console.WriteLine("Starting TUI version...");
+            Console.WriteLine("Starting DbOps - PostgreSQL Database Monitor...");
+            Console.WriteLine("Initializing connection manager...");
+
+            // Initialize connection manager
+            var connectionManager = new ConnectionManager();
+
+            // Get or select a connection
+            var selectedConnection = GetOrSelectConnection(connectionManager);
+            if (selectedConnection == null) {
+                Console.WriteLine("No connection selected. Exiting...");
+                return;
+            }
+
+            Console.WriteLine($"Using connection: {selectedConnection.DisplayName}");
             Console.WriteLine("Creating PostgreSQL service...");
 
-            // Create PostgreSQL service
-            var postgresService = new SyncPostgresService(host, port, database, username, password);
+            // Create PostgreSQL service from selected connection
+            var postgresService = connectionManager.CreatePostgresService(selectedConnection);
 
             Console.WriteLine("Testing database connection...");
 
@@ -49,8 +57,7 @@ class Program {
                 Console.WriteLine("╚══════════════════════════════════════════════════════════════╝");
                 Console.WriteLine();
                 Console.WriteLine($"❌ Could not connect to PostgreSQL database!");
-                Console.WriteLine($"📍 Connection: {host}:{port}/{database}");
-                Console.WriteLine($"👤 Username: {username}");
+                Console.WriteLine($"📍 Connection: {selectedConnection.ConnectionSummary}");
 
                 if (!string.IsNullOrEmpty(connectionError)) {
                     Console.WriteLine($"💥 Error: {connectionError}");
@@ -59,9 +66,9 @@ class Program {
                 Console.WriteLine();
                 Console.WriteLine("🔍 Please verify:");
                 Console.WriteLine("   1. PostgreSQL server is running");
-                Console.WriteLine("   2. Database 'postgres' exists");
+                Console.WriteLine("   2. Database exists and is accessible");
                 Console.WriteLine("   3. Username and password are correct");
-                Console.WriteLine("   4. Port 5433 is accessible");
+                Console.WriteLine("   4. Network connectivity is available");
                 Console.WriteLine("   5. No firewall blocking the connection");
                 Console.WriteLine();
                 Console.WriteLine("Would you like to try the simple console version instead? (y/n): ");
@@ -75,13 +82,16 @@ class Program {
 
             Console.WriteLine("Connection successful! Initializing Terminal.Gui...");
 
+            // Update connection usage
+            connectionManager.UpdateConnectionLastUsed(selectedConnection.Id);
+
             // Initialize Terminal.Gui AFTER successful connection test
             Application.Init();
 
             Console.WriteLine("Creating UI...");
 
-            // Create and setup main window
-            var mainWindow = new MainWindow(postgresService);
+            // Create and setup main window with connection management
+            var mainWindow = new MainWindow(postgresService, connectionManager, selectedConnection);
 
             // Set as top-level window
             Application.Top.Add(mainWindow);
@@ -114,6 +124,75 @@ class Program {
         } finally {
             // Cleanup Terminal.Gui
             try { Application.Shutdown(); } catch { }
+        }
+    }
+
+    static DatabaseConnection? GetOrSelectConnection(ConnectionManager connectionManager) {
+        try {
+            // Check if there's a default connection
+            var defaultConnection = connectionManager.DefaultConnection;
+            if (defaultConnection != null) {
+                Console.WriteLine($"Found default connection: {defaultConnection.DisplayName}");
+
+                // Try to decrypt the password to see if it's valid
+                try {
+                    var testPassword = connectionManager.GetDecryptedPassword(defaultConnection);
+                    if (string.IsNullOrEmpty(testPassword)) {
+                        Console.WriteLine("⚠️  Warning: Password decryption failed for default connection.");
+                        Console.WriteLine("This may be due to corrupted data or running on a different machine.");
+                        Console.WriteLine("You'll need to re-enter the password using the connection manager.");
+                        return ShowConnectionManagerTui(connectionManager);
+                    }
+                } catch (Exception ex) {
+                    Console.WriteLine($"⚠️  Warning: Password decryption failed: {ex.Message}");
+                    return ShowConnectionManagerTui(connectionManager);
+                }
+
+                return defaultConnection;
+            }
+
+            // Check if there are any connections at all
+            if (!connectionManager.HasConnections) {
+                Console.WriteLine("No connections configured. Opening connection manager...");
+                return ShowConnectionManagerTui(connectionManager);
+            }
+
+            // Multiple connections available, let user choose via TUI
+            Console.WriteLine("Multiple connections available. Opening connection manager...");
+            return ShowConnectionManagerTui(connectionManager);
+        } catch (Exception ex) {
+            Console.WriteLine($"Error managing connections: {ex.Message}");
+            Console.WriteLine("Opening connection manager...");
+            return ShowConnectionManagerTui(connectionManager);
+        }
+    }
+
+    static DatabaseConnection? ShowConnectionManagerTui(ConnectionManager connectionManager) {
+        try {
+            // Initialize Terminal.Gui for the connection manager
+            Application.Init();
+
+            DatabaseConnection? selectedConnection = null;
+
+            // Show connection selection dialog
+            var connectionDialog = new ConnectionSelectionDialog(connectionManager);
+            Application.Run(connectionDialog);
+
+            if (connectionDialog.ConnectionSelected && connectionDialog.SelectedConnection != null) {
+                selectedConnection = connectionDialog.SelectedConnection;
+            }
+
+            // Cleanup Terminal.Gui
+            Application.Shutdown();
+
+            return selectedConnection;
+        } catch (Exception ex) {
+            // Cleanup Terminal.Gui on error
+            try { Application.Shutdown(); } catch { }
+
+            Console.WriteLine($"Error showing connection manager: {ex.Message}");
+            Console.WriteLine("Please check your terminal compatibility.");
+            return null;
         }
     }
 }

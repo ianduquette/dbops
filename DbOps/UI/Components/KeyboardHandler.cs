@@ -11,6 +11,10 @@ public class KeyboardHandler {
         { Key.q, KeyAction.Quit },
         { Key.Q, KeyAction.Quit },
         
+        // Connection management
+        { Key.c, KeyAction.ShowConnections },
+        { Key.C, KeyAction.ShowConnections },
+        
         // Display modes
         { Key.w, KeyAction.ShowWaitInfo },
         { Key.W, KeyAction.ShowWaitInfo },
@@ -30,6 +34,7 @@ public class KeyboardHandler {
     public event Action? ShowWaitInfoRequested;
     public event Action? ShowSessionDetailsRequested;
     public event Action? ShowLockingInfoRequested;
+    public event Action? ShowConnectionsRequested;
 
     public bool HandleKeyPress(KeyEvent keyEvent) {
         if (_keyMappings.TryGetValue(keyEvent.Key, out var action)) {
@@ -56,6 +61,9 @@ public class KeyboardHandler {
             case KeyAction.ShowLockingInfo:
                 ShowLockingInfoRequested?.Invoke();
                 break;
+            case KeyAction.ShowConnections:
+                ShowConnectionsRequested?.Invoke();
+                break;
         }
     }
 
@@ -81,16 +89,17 @@ public class KeyboardHandler {
         var waitKeys = GetUniqueKeysForDisplay(KeyAction.ShowWaitInfo);
         var sessionKeys = GetUniqueKeysForDisplay(KeyAction.ShowSessionDetails);
         var lockKeys = GetUniqueKeysForDisplay(KeyAction.ShowLockingInfo);
+        var connectionKeys = GetUniqueKeysForDisplay(KeyAction.ShowConnections);
 
         if (terminalWidth < 80) {
             // Very compact for narrow terminals
-            return $"↑↓ Nav | {string.Join("/", refreshKeys)} Refresh | {string.Join("/", waitKeys)}/{string.Join("/", sessionKeys)}/{string.Join("/", lockKeys)} Mode | {string.Join("/", quitKeys)} Quit";
-        } else if (terminalWidth < 100) {
+            return $"↑↓ Nav | {string.Join("/", refreshKeys)} Refresh | {string.Join("/", connectionKeys)} Conn | {string.Join("/", waitKeys)}/{string.Join("/", sessionKeys)}/{string.Join("/", lockKeys)} Mode | {string.Join("/", quitKeys)} Quit";
+        } else if (terminalWidth < 120) {
             // Compact for medium terminals
-            return $"[↑↓] Nav | [{string.Join("/", refreshKeys)}] Refresh | [{string.Join("/", waitKeys)}/{string.Join("/", sessionKeys)}/{string.Join("/", lockKeys)}] Mode | [{string.Join("/", quitKeys)}] Quit";
+            return $"[↑↓] Nav | [{string.Join("/", refreshKeys)}] Refresh | [{string.Join("/", connectionKeys)}] Connections | [{string.Join("/", waitKeys)}/{string.Join("/", sessionKeys)}/{string.Join("/", lockKeys)}] Mode | [{string.Join("/", quitKeys)}] Quit";
         } else {
             // Full text for wide terminals
-            return $"[↑↓] Navigate | [{string.Join("/", refreshKeys)}] Refresh | [{string.Join("/", waitKeys)}] Wait | [{string.Join("/", sessionKeys)}] Session | [{string.Join("/", lockKeys)}] Lock | [{string.Join("/", quitKeys)}] Quit";
+            return $"[↑↓] Navigate | [{string.Join("/", refreshKeys)}] Refresh | [{string.Join("/", connectionKeys)}] Connections | [{string.Join("/", waitKeys)}] Wait | [{string.Join("/", sessionKeys)}] Session | [{string.Join("/", lockKeys)}] Lock | [{string.Join("/", quitKeys)}] Quit";
         }
     }
 
@@ -114,5 +123,6 @@ public enum KeyAction {
     Refresh,
     ShowWaitInfo,
     ShowSessionDetails,
-    ShowLockingInfo
+    ShowLockingInfo,
+    ShowConnections
 }

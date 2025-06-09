@@ -3,7 +3,7 @@ using DbOps.Services;
 namespace DbOps.UI.Components;
 
 public class DisplayModeManager {
-    private readonly SyncPostgresService _postgresService;
+    private SyncPostgresService _postgresService;
     public enum DisplayMode { SessionDetails, WaitInformation, LockingInformation }
 
     private DisplayMode _currentMode = DisplayMode.SessionDetails;
@@ -13,6 +13,10 @@ public class DisplayModeManager {
 
     public DisplayModeManager(SyncPostgresService postgresService) {
         _postgresService = postgresService;
+    }
+
+    public void UpdatePostgresService(SyncPostgresService newPostgresService) {
+        _postgresService = newPostgresService;
     }
 
     public void SetMode(DisplayMode mode) {

@@ -94,14 +94,22 @@ public class SessionListComponent {
         _sessionCountLabel.Text = $"Active Sessions ({_sessions.Count}):";
 
         RestoreSelection(previousSelectedPid, previousTopItem);
+
+        // Force refresh of all components
+        _sessionCountLabel.SetNeedsDisplay();
+        _sessionHeaderLabel.SetNeedsDisplay();
+        _sessionListView.SetNeedsDisplay();
     }
 
     private void RefreshDisplay() {
-        if (_sessions.Count == 0) return;
-
         int terminalWidth = Application.Driver?.Cols ?? 120;
-        var sessionTexts = _sessions.Select(s => s.GetDisplayText(terminalWidth)).ToList();
-        _sessionListView.SetSource(sessionTexts);
+
+        if (_sessions.Count == 0) {
+            _sessionListView.SetSource(new List<string>());
+        } else {
+            var sessionTexts = _sessions.Select(s => s.GetDisplayText(terminalWidth)).ToList();
+            _sessionListView.SetSource(sessionTexts);
+        }
     }
 
     private void RestoreSelection(int? previousSelectedPid, int previousTopItem) {

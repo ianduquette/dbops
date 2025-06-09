@@ -5,7 +5,7 @@ using Terminal.Gui;
 namespace DbOps.UI.Components;
 
 public class DataRefreshService {
-    private readonly SyncPostgresService _postgresService;
+    private SyncPostgresService _postgresService;
     private readonly StatusBarComponent _statusBar;
 
     public event Action<List<DatabaseSession>>? SessionsRefreshed;
@@ -14,6 +14,10 @@ public class DataRefreshService {
     public DataRefreshService(SyncPostgresService postgresService, StatusBarComponent statusBar) {
         _postgresService = postgresService;
         _statusBar = statusBar;
+    }
+
+    public void UpdatePostgresService(SyncPostgresService newPostgresService) {
+        _postgresService = newPostgresService;
     }
 
     public void RefreshSessions() {
