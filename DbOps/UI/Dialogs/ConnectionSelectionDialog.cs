@@ -1,5 +1,5 @@
-using DbOps.Models;
-using DbOps.Services;
+using DbOps.Domain.Models;
+using DbOps.Domain.Services;
 using Terminal.Gui;
 
 namespace DbOps.UI.Dialogs;

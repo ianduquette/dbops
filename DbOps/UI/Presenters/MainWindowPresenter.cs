@@ -1,9 +1,9 @@
-using DbOps.Interfaces;
-using DbOps.Models;
-using DbOps.Services;
+using DbOps.UI.Views;
+using DbOps.Domain.Models;
+using DbOps.Domain.Services;
 using DbOps.UI.Components;
 
-namespace DbOps.Presenters;
+namespace DbOps.UI.Presenters;
 
 public class MainWindowPresenter : IDisposable {
     private readonly IMainView _view;
@@ -46,7 +46,6 @@ public class MainWindowPresenter : IDisposable {
         _view.UpdateConnectionStatus("Disconnected - Press 'c' to select connection");
         UpdateStatusBarMode();
 
-        // Now try to connect to default - simple and synchronous
         TryConnectToDefault();
     }
 
@@ -64,7 +63,7 @@ public class MainWindowPresenter : IDisposable {
                 port: 5433,
                 database: "postgres",
                 username: "postgres",
-                password: "cenozon"
+                password: "pwd"
             );
 
             var success = _sessionManager.ConnectWithService(
@@ -108,7 +107,6 @@ public class MainWindowPresenter : IDisposable {
             _selectedSession = session;
 
             if (session != null) {
-                // Direct synchronous update - no threading!
                 UpdateDisplayForCurrentMode();
             }
         } catch (Exception ex) {

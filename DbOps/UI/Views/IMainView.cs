@@ -1,8 +1,8 @@
-using DbOps.Models;
-using DbOps.Services;
+using DbOps.Domain.Models;
+using DbOps.Domain.Services;
 using DbOps.UI.Components;
 
-namespace DbOps.Interfaces;
+namespace DbOps.UI.Views;
 
 public interface IMainView {
     // Events
@@ -11,7 +11,6 @@ public interface IMainView {
     event Action? ViewLoaded;
     event Action? ViewClosing;
 
-    // UI Updates (simplified - just sync for now)
     void UpdateConnectionStatus(string status);
     void UpdateSessions(List<DatabaseSession> sessions);
     void UpdateSessionDetails(DatabaseSession? session);

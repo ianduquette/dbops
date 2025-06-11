@@ -1,6 +1,6 @@
-using DbOps.Models;
+using DbOps.Domain.Models;
 
-namespace DbOps.Services;
+namespace DbOps.Domain.Services;
 
 public class SessionManager : IDisposable {
     private SyncPostgresService? _service;
@@ -31,7 +31,6 @@ public class SessionManager : IDisposable {
         try {
             ConnectionStateChanged?.Invoke(ConnectionState.Connecting);
 
-            // Test connection first - synchronous
             var isConnected = service.TestConnection();
             if (!isConnected) {
                 ConnectionStateChanged?.Invoke(ConnectionState.Failed);

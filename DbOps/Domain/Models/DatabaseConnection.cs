@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DbOps.Models;
+namespace DbOps.Domain.Models;
 
 public class DatabaseConnection {
     [JsonPropertyName("id")]

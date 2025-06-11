@@ -19,16 +19,14 @@ A Terminal User Interface (TUI) application for monitoring PostgreSQL database s
 
 ### Running the Application
 
-The application offers two interfaces:
+The application offers one interface:
 1. **Terminal User Interface (TUI)** - Full-featured graphical interface
-2. **Simple Console Version** - Basic text-based interface
 
 #### Option 1: VSCode F5 Debug (Recommended)
 
 1. Open the project in VSCode
 2. Press **F5** or go to **Run > Start Debugging**
 3. The application will build automatically and open in an external terminal window
-4. Choose your preferred interface (TUI or Simple Console)
 
 #### Option 2: Using the Launcher Scripts
 
@@ -61,10 +59,6 @@ Before running the main application, you can test the database connection:
 ```
 
 ### Interface Selection
-
-When you run the application, you'll be prompted to choose:
-1. **TUI Interface** - Full Terminal.Gui interface with navigation
-2. **Simple Console** - Basic console output (works in any terminal)
 
 ### Controls
 
@@ -149,7 +143,7 @@ DbOps/
 **Solutions**:
 1. Verify PostgreSQL is running on localhost:5433
 2. Check that the database "postgres" exists
-3. Verify the username "postgres" and password "cenozon" are correct
+3. Verify the username "postgres" and password "pwd" are correct
 4. Run the connection test: `.\test-connection-fast.ps1`
 
 ### Application Crashes or Freezes

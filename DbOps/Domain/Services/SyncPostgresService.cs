@@ -1,8 +1,8 @@
-using DbOps.Models;
-using DbOps.Queries;
+using DbOps.Domain.Models;
+using DbOps.Domain.Queries;
 using Npgsql;
 
-namespace DbOps.Services;
+namespace DbOps.Domain.Services;
 
 public class SyncPostgresService {
     private readonly string _connectionString;

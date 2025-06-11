@@ -1,4 +1,4 @@
-namespace DbOps.Models;
+namespace DbOps.Domain.Models;
 
 public class DatabaseLock {
     public string LockType { get; set; } = string.Empty;

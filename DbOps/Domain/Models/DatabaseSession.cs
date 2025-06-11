@@ -1,4 +1,4 @@
-namespace DbOps.Models;
+namespace DbOps.Domain.Models;
 
 public class DatabaseSession {
     public int Pid { get; set; }

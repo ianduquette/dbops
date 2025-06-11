@@ -1,4 +1,4 @@
-using DbOps.Models;
+using DbOps.Domain.Models;
 using Terminal.Gui;
 
 namespace DbOps.UI.Components;
@@ -83,7 +83,6 @@ public class SessionListComponent {
 
     private void SetupEventHandlers() {
         _sessionListView.SelectedItemChanged += args => {
-            // Simple bounds check - no threading issues when synchronous
             if (args.Item >= 0 && args.Item < _sessions.Count && _sessions.Count > 0) {
                 SessionSelected?.Invoke(args.Item);
             }

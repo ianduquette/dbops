@@ -1,6 +1,5 @@
-using DbOps.Models;
-using DbOps.Services;
-namespace DbOps.UI.Components;
+using DbOps.Domain.Models;
+namespace DbOps.Domain.Logic;
 
 public class DisplayModeManager {
     public enum DisplayMode { SessionDetails, WaitInformation, LockingInformation }
@@ -10,9 +9,7 @@ public class DisplayModeManager {
     public DisplayMode CurrentMode => _currentMode;
     public event Action? ModeChanged;
 
-    public DisplayModeManager() {
-        // No dependencies needed - much cleaner!
-    }
+    public DisplayModeManager() { }
 
     public void SetMode(DisplayMode mode) {
         if (_currentMode != mode) {

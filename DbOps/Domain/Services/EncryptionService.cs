@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DbOps.Services;
+namespace DbOps.Domain.Services;
 
 public class EncryptionService {
     private const int KeySize = 256;

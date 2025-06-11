@@ -1,6 +1,6 @@
-using DbOps.Interfaces;
-using DbOps.Models;
-using DbOps.Services;
+using DbOps.UI.Views;
+using DbOps.Domain.Models;
+using DbOps.Domain.Services;
 using DbOps.UI.Components;
 
 namespace DbOps.Testing;

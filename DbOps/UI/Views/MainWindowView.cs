@@ -1,14 +1,14 @@
-using DbOps.Interfaces;
-using DbOps.Models;
-using DbOps.Services;
+using DbOps.Domain.Models;
+using DbOps.Domain.Services;
+using DbOps.Domain.Logic;
 using DbOps.UI.Components;
 using DbOps.UI.Dialogs;
-using DbOps.Presenters;
+using DbOps.UI.Presenters;
 using Terminal.Gui;
 
-namespace DbOps.UI;
+namespace DbOps.UI.Views;
 
-public class MainWindow : Window, IMainView {
+public class MainWindowView : Window, IMainView {
     // Events from IMainView
     public event Action<int>? SessionSelected;
     public event Action<UserAction>? ActionRequested;
@@ -27,7 +27,7 @@ public class MainWindow : Window, IMainView {
     // State
     private bool _initialized = false;
 
-    public MainWindow() : base("PostgreSQL Database Monitor") {
+    public MainWindowView() : base("PostgreSQL Database Monitor") {
         InitializeComponents();
         InitializeLayout();
         SetupEventHandlers();

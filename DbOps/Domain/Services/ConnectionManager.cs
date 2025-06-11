@@ -1,8 +1,8 @@
 using System.Text.Json;
-using DbOps.Models;
+using DbOps.Domain.Models;
 using Npgsql;
 
-namespace DbOps.Services;
+namespace DbOps.Domain.Services;
 
 public class ConnectionManager {
     private readonly EncryptionService _encryptionService;

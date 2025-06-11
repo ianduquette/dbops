@@ -1,11 +1,11 @@
-using DbOps.UI;
+using DbOps.UI.Views;
 using Terminal.Gui;
 
 namespace DbOps;
 
 class Program {
     static void Main(string[] args) {
-        MainWindow? mainWindow = null;
+        MainWindowView? mainWindow = null;
 
         try {
             Console.WriteLine("Starting DbOps - PostgreSQL Database Monitor...");
@@ -14,7 +14,7 @@ class Program {
             Application.Init();
 
             // Create main window with MVP pattern
-            mainWindow = new MainWindow();
+            mainWindow = new MainWindowView();
 
             // Add to Terminal.Gui
             Application.Top.Add(mainWindow);

@@ -1,4 +1,4 @@
-namespace DbOps.Queries;
+namespace DbOps.Domain.Queries;
 
 public static class PostgresQueries {
     public const string GetActiveSessions = @"
