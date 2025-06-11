@@ -13,8 +13,12 @@ public class SessionListComponent {
     public event Action<int>? SessionSelected;
     public ListView ListView => _sessionListView;
     public int SelectedIndex => _sessionListView.SelectedItem;
-    public DatabaseSession? SelectedSession =>
-        SelectedIndex >= 0 && SelectedIndex < _sessions.Count ? _sessions[SelectedIndex] : null;
+    public DatabaseSession? SelectedSession {
+        get {
+            var index = SelectedIndex;
+            return index >= 0 && index < _sessions.Count ? _sessions[index] : null;
+        }
+    }
 
     public SessionListComponent() {
         _sessionCountLabel = new Label("Active Sessions (0):") {
@@ -79,7 +83,8 @@ public class SessionListComponent {
 
     private void SetupEventHandlers() {
         _sessionListView.SelectedItemChanged += args => {
-            if (args.Item >= 0 && args.Item < _sessions.Count) {
+            // Simple bounds check - no threading issues when synchronous
+            if (args.Item >= 0 && args.Item < _sessions.Count && _sessions.Count > 0) {
                 SessionSelected?.Invoke(args.Item);
             }
         };
@@ -89,7 +94,7 @@ public class SessionListComponent {
         var previousSelectedPid = SelectedSession?.Pid;
         var previousTopItem = _sessionListView.TopItem;
 
-        _sessions = sessions;
+        _sessions = sessions ?? new List<DatabaseSession>();
         RefreshDisplay();
         _sessionCountLabel.Text = $"Active Sessions ({_sessions.Count}):";
 
@@ -113,23 +118,31 @@ public class SessionListComponent {
     }
 
     private void RestoreSelection(int? previousSelectedPid, int previousTopItem) {
+        if (_sessions.Count == 0) {
+            _sessionListView.SelectedItem = -1;
+            _sessionListView.TopItem = 0;
+            return;
+        }
+
         int newSelectedIndex = 0;
 
-        if (previousSelectedPid.HasValue && _sessions.Count > 0) {
+        if (previousSelectedPid.HasValue) {
             var matchingSessionIndex = _sessions.FindIndex(s => s.Pid == previousSelectedPid.Value);
-            if (matchingSessionIndex >= 0) {
+            if (matchingSessionIndex >= 0 && matchingSessionIndex < _sessions.Count) {
                 newSelectedIndex = matchingSessionIndex;
             }
         }
 
-        if (_sessions.Count > 0) {
-            _sessionListView.SelectedItem = newSelectedIndex;
+        // Ensure the selected index is within bounds
+        newSelectedIndex = Math.Max(0, Math.Min(newSelectedIndex, _sessions.Count - 1));
 
-            if (previousTopItem < _sessions.Count) {
-                _sessionListView.TopItem = previousTopItem;
-            } else if (_sessions.Count > 0) {
-                _sessionListView.TopItem = Math.Max(0, newSelectedIndex - 5);
-            }
+        _sessionListView.SelectedItem = newSelectedIndex;
+
+        // Set top item safely
+        if (previousTopItem >= 0 && previousTopItem < _sessions.Count) {
+            _sessionListView.TopItem = previousTopItem;
+        } else {
+            _sessionListView.TopItem = Math.Max(0, Math.Min(newSelectedIndex - 5, _sessions.Count - 1));
         }
     }
 

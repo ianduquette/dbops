@@ -96,7 +96,7 @@ Currently configured for:
 - **Port**: 5433
 - **Database**: postgres
 - **Username**: postgres
-- **Password**: cenozon
+- **Password**: pwd
 
 ## Architecture
 

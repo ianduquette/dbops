@@ -33,7 +33,13 @@ public class SyncPostgresService {
             var result = command.ExecuteScalar();
 
             return result != null;
-        } catch {
+        } catch (NpgsqlException ex) {
+            // Log specific PostgreSQL errors for debugging
+            System.Diagnostics.Debug.WriteLine($"PostgreSQL connection test failed: {ex.SqlState} - {ex.Message}");
+            return false;
+        } catch (Exception ex) {
+            // Log general connection errors
+            System.Diagnostics.Debug.WriteLine($"Connection test failed: {ex.Message}");
             return false;
         }
     }
@@ -71,8 +77,23 @@ public class SyncPostgresService {
 
                 sessions.Add(session);
             }
+        } catch (NpgsqlException ex) {
+            // Provide more specific error messages for PostgreSQL errors
+            var errorMessage = ex.SqlState switch {
+                "08000" => "Connection exception - database server may be down",
+                "08003" => "Connection does not exist - connection was lost",
+                "08006" => "Connection failure - network or server issue",
+                "28000" => "Invalid authorization - check username/password",
+                "3D000" => "Invalid catalog name - database does not exist",
+                _ => $"Database connection error: {ex.Message}"
+            };
+            throw new InvalidOperationException(errorMessage, ex);
         } catch (Exception ex) {
-            throw new InvalidOperationException($"Failed to retrieve sessions: {ex.Message}", ex);
+            // Handle other connection-related exceptions
+            var errorMessage = ex.Message.Contains("timeout")
+                ? "Connection timeout - database server may be overloaded or unreachable"
+                : $"Failed to retrieve sessions: {ex.Message}";
+            throw new InvalidOperationException(errorMessage, ex);
         }
 
         return sessions;

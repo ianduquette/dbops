@@ -6,26 +6,26 @@ public class KeyboardHandler {
     // Easy-to-modify key mappings - developers can change these easily
     // Example: To change quit from Q to Escape, replace the lines below with:
     // { Key.Escape, KeyAction.Quit },
-    private readonly Dictionary<Key, KeyAction> _keyMappings = new() {
+    private readonly Dictionary<Key, UserAction> _keyMappings = new() {
         // Application control
-        { Key.q, KeyAction.Quit },
-        { Key.Q, KeyAction.Quit },
+        { Key.q, UserAction.Quit },
+        { Key.Q, UserAction.Quit },
         
         // Connection management
-        { Key.c, KeyAction.ShowConnections },
-        { Key.C, KeyAction.ShowConnections },
+        { Key.c, UserAction.ShowConnections },
+        { Key.C, UserAction.ShowConnections },
         
         // Display modes
-        { Key.w, KeyAction.ShowWaitInfo },
-        { Key.W, KeyAction.ShowWaitInfo },
-        { Key.s, KeyAction.ShowSessionDetails },
-        { Key.S, KeyAction.ShowSessionDetails },
-        { Key.l, KeyAction.ShowLockingInfo },
-        { Key.L, KeyAction.ShowLockingInfo },
+        { Key.w, UserAction.ShowWaitInfo },
+        { Key.W, UserAction.ShowWaitInfo },
+        { Key.s, UserAction.ShowSessionDetails },
+        { Key.S, UserAction.ShowSessionDetails },
+        { Key.l, UserAction.ShowLockingInfo },
+        { Key.L, UserAction.ShowLockingInfo },
         
         // Actions
-        { Key.Enter, KeyAction.Refresh },
-        { Key.F5, KeyAction.Refresh }
+        { Key.Enter, UserAction.Refresh },
+        { Key.F5, UserAction.Refresh }
     };
 
     // Events that the MainWindow can subscribe to
@@ -44,36 +44,36 @@ public class KeyboardHandler {
         return false; // Key was not handled
     }
 
-    private void ExecuteAction(KeyAction action) {
+    private void ExecuteAction(UserAction action) {
         switch (action) {
-            case KeyAction.Quit:
+            case UserAction.Quit:
                 QuitRequested?.Invoke();
                 break;
-            case KeyAction.Refresh:
+            case UserAction.Refresh:
                 RefreshRequested?.Invoke();
                 break;
-            case KeyAction.ShowWaitInfo:
+            case UserAction.ShowWaitInfo:
                 ShowWaitInfoRequested?.Invoke();
                 break;
-            case KeyAction.ShowSessionDetails:
+            case UserAction.ShowSessionDetails:
                 ShowSessionDetailsRequested?.Invoke();
                 break;
-            case KeyAction.ShowLockingInfo:
+            case UserAction.ShowLockingInfo:
                 ShowLockingInfoRequested?.Invoke();
                 break;
-            case KeyAction.ShowConnections:
+            case UserAction.ShowConnections:
                 ShowConnectionsRequested?.Invoke();
                 break;
         }
     }
 
     // Helper method to get all mapped keys for a specific action (useful for help text)
-    public IEnumerable<Key> GetKeysForAction(KeyAction action) {
+    public IEnumerable<Key> GetKeysForAction(UserAction action) {
         return _keyMappings.Where(kvp => kvp.Value == action).Select(kvp => kvp.Key);
     }
 
     // Helper method to add or change key mappings programmatically
-    public void SetKeyMapping(Key key, KeyAction action) {
+    public void SetKeyMapping(Key key, UserAction action) {
         _keyMappings[key] = action;
     }
 
@@ -84,12 +84,12 @@ public class KeyboardHandler {
 
     // Get display text for status bar - dynamically reflects current key mappings
     public string GetStatusBarKeyText(int terminalWidth) {
-        var quitKeys = GetUniqueKeysForDisplay(KeyAction.Quit);
-        var refreshKeys = GetUniqueKeysForDisplay(KeyAction.Refresh);
-        var waitKeys = GetUniqueKeysForDisplay(KeyAction.ShowWaitInfo);
-        var sessionKeys = GetUniqueKeysForDisplay(KeyAction.ShowSessionDetails);
-        var lockKeys = GetUniqueKeysForDisplay(KeyAction.ShowLockingInfo);
-        var connectionKeys = GetUniqueKeysForDisplay(KeyAction.ShowConnections);
+        var quitKeys = GetUniqueKeysForDisplay(UserAction.Quit);
+        var refreshKeys = GetUniqueKeysForDisplay(UserAction.Refresh);
+        var waitKeys = GetUniqueKeysForDisplay(UserAction.ShowWaitInfo);
+        var sessionKeys = GetUniqueKeysForDisplay(UserAction.ShowSessionDetails);
+        var lockKeys = GetUniqueKeysForDisplay(UserAction.ShowLockingInfo);
+        var connectionKeys = GetUniqueKeysForDisplay(UserAction.ShowConnections);
 
         if (terminalWidth < 80) {
             // Very compact for narrow terminals
@@ -104,7 +104,7 @@ public class KeyboardHandler {
     }
 
     // Get unique keys for display, avoiding duplicates like Q/Q
-    private string[] GetUniqueKeysForDisplay(KeyAction action) {
+    private string[] GetUniqueKeysForDisplay(UserAction action) {
         var keys = GetKeysForAction(action).Select(FormatKeyForDisplay).ToHashSet();
         return keys.ToArray();
     }
@@ -118,7 +118,7 @@ public class KeyboardHandler {
     }
 }
 
-public enum KeyAction {
+public enum UserAction {
     Quit,
     Refresh,
     ShowWaitInfo,

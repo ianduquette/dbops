@@ -116,14 +116,13 @@ public class SessionDetailsComponent {
         } else {
             _queryTextView.Text = "No session selected\n\nUse ↑↓ arrows to navigate sessions";
             _currentQueryTextView.Text = "Select a session to view its current query";
+            RefreshViews();
         }
     }
 
     private void RefreshViews() {
         _currentQueryTextView.SetNeedsDisplay();
-        _currentQueryScrollBar.Refresh();
         _queryTextView.SetNeedsDisplay();
-        _queryTextScrollBar.Refresh();
     }
 
     private void UpdateQueryLabel() {
@@ -131,6 +130,7 @@ public class SessionDetailsComponent {
     }
     public TextView QueryTextView => _queryTextView;
     public TextView CurrentQueryTextView => _currentQueryTextView;
+    public DisplayModeManager DisplayModeManager => _displayModeManager;
 
     public void InitializeScrollBars() {
         SetupScrollBars();

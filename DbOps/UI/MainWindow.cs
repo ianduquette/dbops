@@ -1,38 +1,51 @@
+using DbOps.Interfaces;
 using DbOps.Models;
 using DbOps.Services;
 using DbOps.UI.Components;
 using DbOps.UI.Dialogs;
+using DbOps.Presenters;
 using Terminal.Gui;
 
 namespace DbOps.UI;
 
-public class MainWindow : Window {
-    private readonly SessionListComponent _sessionListComponent;
-    private readonly SessionDetailsComponent _sessionDetailsComponent;
-    private readonly StatusBarComponent _statusBar;
-    private readonly KeyboardHandler _keyboardHandler;
-    private readonly DisplayModeManager _displayModeManager;
-    private readonly DataRefreshService _dataRefreshService;
-    private readonly Label _connectionLabel;
-    private readonly ConnectionManager _connectionManager;
+public class MainWindow : Window, IMainView {
+    // Events from IMainView
+    public event Action<int>? SessionSelected;
+    public event Action<UserAction>? ActionRequested;
+    public event Action? ViewLoaded;
+    public event Action? ViewClosing;
 
-    private List<DatabaseSession> _sessions = new();
-    private SyncPostgresService _postgresService;
-    private DatabaseConnection? _currentConnection;
+    // UI Components - not readonly to avoid assignment issues
+    private SessionListComponent _sessionListComponent = null!;
+    private SessionDetailsComponent _sessionDetailsComponent = null!;
+    private StatusBarComponent _statusBar = null!;
+    private Label _connectionLabel = null!;
 
-    public MainWindow(SyncPostgresService postgresService, ConnectionManager connectionManager, DatabaseConnection? currentConnection = null) : base("PostgreSQL Database Monitor") {
-        _postgresService = postgresService;
-        _connectionManager = connectionManager;
-        _currentConnection = currentConnection;
-        _displayModeManager = new DisplayModeManager(_postgresService);
-        _keyboardHandler = new KeyboardHandler();
-        _statusBar = new StatusBarComponent(_keyboardHandler);
-        _dataRefreshService = new DataRefreshService(_postgresService, _statusBar);
+    // Presenter
+    private MainWindowPresenter? _presenter;
 
+    // State
+    private bool _initialized = false;
+
+    public MainWindow() : base("PostgreSQL Database Monitor") {
+        InitializeComponents();
+        InitializeLayout();
+        SetupEventHandlers();
+    }
+
+    public new bool IsInitialized => _initialized;
+
+    private void InitializeComponents() {
         _sessionListComponent = new SessionListComponent();
-        _sessionDetailsComponent = new SessionDetailsComponent(_displayModeManager, _sessionListComponent.ListView);
 
-        _connectionLabel = new Label(GetConnectionDisplayText()) {
+        // Create DisplayModeManager without service - will be updated when connection is established
+        var displayModeManager = new DisplayModeManager();
+        _sessionDetailsComponent = new SessionDetailsComponent(displayModeManager, _sessionListComponent.ListView);
+
+        var keyboardHandler = new KeyboardHandler();
+        _statusBar = new StatusBarComponent(keyboardHandler);
+
+        _connectionLabel = new Label("Initializing...") {
             X = 1,
             Y = 1,
             ColorScheme = new ColorScheme {
@@ -41,8 +54,8 @@ public class MainWindow : Window {
             }
         };
 
-        InitializeLayout();
-        SetupEventHandlers();
+        // Setup key event forwarding for text views
+        SetupTextViewKeyHandling();
     }
 
     private void InitializeLayout() {
@@ -67,6 +80,9 @@ public class MainWindow : Window {
         // Add status bar
         Add(_statusBar.StatusLabel);
 
+        // Initialize status bar with commands
+        _statusBar.UpdateStatus("Session Details");
+
         // Initialize scrollbars after components are added to parent
         _sessionListComponent.InitializeScrollBar();
         _sessionDetailsComponent.InitializeScrollBars();
@@ -82,303 +98,225 @@ public class MainWindow : Window {
     }
 
     private void SetupEventHandlers() {
-        // Session selection events
-        _sessionListComponent.SessionSelected += OnSessionSelected;
-
-        // Data refresh events
-        _dataRefreshService.SessionsRefreshed += OnSessionsRefreshed;
-        _dataRefreshService.ErrorOccurred += OnDataRefreshError;
-
-        // Display mode events
-        _displayModeManager.ModeChanged += OnModeChanged;
-
-        // Connection management events
-        _connectionManager.ConnectionDeleted += OnConnectionDeleted;
-
-        // Keyboard events
-        _keyboardHandler.QuitRequested += PromptToQuit;
-        _keyboardHandler.RefreshRequested += HandleRefreshRequest;
-        _keyboardHandler.ShowWaitInfoRequested += () => _displayModeManager.SetMode(DisplayModeManager.DisplayMode.WaitInformation);
-        _keyboardHandler.ShowSessionDetailsRequested += () => _displayModeManager.SetMode(DisplayModeManager.DisplayMode.SessionDetails);
-        _keyboardHandler.ShowLockingInfoRequested += () => _displayModeManager.SetMode(DisplayModeManager.DisplayMode.LockingInformation);
-        _keyboardHandler.ShowConnectionsRequested += ShowConnectionSelectionDialog;
+        // Session selection events - forward to presenter
+        _sessionListComponent.SessionSelected += (index) => SessionSelected?.Invoke(index);
 
         // Terminal resize events
         Application.Resized += OnTerminalResized;
-
-        // Add key event handlers to text views
-        _sessionDetailsComponent.QueryTextView.KeyPress += OnTextViewKeyPress;
-        _sessionDetailsComponent.CurrentQueryTextView.KeyPress += OnTextViewKeyPress;
     }
 
-    private void OnSessionSelected(int selectedIndex) {
-        if (selectedIndex >= 0 && selectedIndex < _sessions.Count) {
-            var selectedSession = _sessions[selectedIndex];
-            _sessionDetailsComponent.UpdateSession(selectedSession);
-        } else {
-            _sessionDetailsComponent.UpdateSession(null);
+    private void SetupTextViewKeyHandling() {
+        // Setup key event handlers for text views to forward application keys
+        _sessionDetailsComponent.QueryTextView.KeyPress += (keyEvent) => {
+            // Don't intercept Tab keys - let them be handled by the main window for navigation
+            if (keyEvent.KeyEvent.Key == Key.Tab || keyEvent.KeyEvent.Key == (Key.ShiftMask | Key.Tab)) {
+                return;
+            }
+
+            var action = MapKeyToAction(keyEvent.KeyEvent.Key);
+            if (action.HasValue) {
+                // Handle quit action with confirmation dialog directly
+                if (action.Value == UserAction.Quit) {
+                    if (ShowQuitConfirmation()) {
+                        ActionRequested?.Invoke(action.Value);
+                    }
+                    keyEvent.Handled = true;
+                    return;
+                }
+
+                // Forward other application keys to main window
+                ActionRequested?.Invoke(action.Value);
+                keyEvent.Handled = true;
+            }
+        };
+
+        _sessionDetailsComponent.CurrentQueryTextView.KeyPress += (keyEvent) => {
+            // Don't intercept Tab keys - let them be handled by the main window for navigation
+            if (keyEvent.KeyEvent.Key == Key.Tab || keyEvent.KeyEvent.Key == (Key.ShiftMask | Key.Tab)) {
+                return;
+            }
+
+            var action = MapKeyToAction(keyEvent.KeyEvent.Key);
+            if (action.HasValue) {
+                // Handle quit action with confirmation dialog directly
+                if (action.Value == UserAction.Quit) {
+                    if (ShowQuitConfirmation()) {
+                        ActionRequested?.Invoke(action.Value);
+                    }
+                    keyEvent.Handled = true;
+                    return;
+                }
+
+                // Forward other application keys to main window
+                ActionRequested?.Invoke(action.Value);
+                keyEvent.Handled = true;
+            }
+        };
+    }
+
+    public override bool ProcessKey(KeyEvent keyEvent) {
+        var action = MapKeyToAction(keyEvent.Key);
+        if (action.HasValue) {
+            // Handle quit action with confirmation dialog
+            if (action.Value == UserAction.Quit) {
+                if (ShowQuitConfirmation()) {
+                    ActionRequested?.Invoke(action.Value);
+                }
+                return true;
+            }
+            ActionRequested?.Invoke(action.Value);
+            return true;
+        }
+
+        // Handle Tab navigation between components
+        if (keyEvent.Key == Key.Tab || keyEvent.Key == (Key.ShiftMask | Key.Tab)) {
+            HandleTabNavigation(keyEvent.Key == (Key.ShiftMask | Key.Tab));
+            return true;
+        }
+
+        return base.ProcessKey(keyEvent);
+    }
+
+    private UserAction? MapKeyToAction(Key key) => key switch {
+        Key.F5 => UserAction.Refresh,
+        Key.CtrlMask | Key.Q => UserAction.Quit,
+        Key.q => UserAction.Quit,
+        Key.Q => UserAction.Quit,
+        Key.c => UserAction.ShowConnections,
+        Key.C => UserAction.ShowConnections,
+        Key.w => UserAction.ShowWaitInfo,
+        Key.W => UserAction.ShowWaitInfo,
+        Key.s => UserAction.ShowSessionDetails,
+        Key.S => UserAction.ShowSessionDetails,
+        Key.l => UserAction.ShowLockingInfo,
+        Key.L => UserAction.ShowLockingInfo,
+        Key.Enter => UserAction.Refresh,
+        _ => null
+    };
+
+    // IMainView Implementation
+    public void UpdateConnectionStatus(string status) {
+        _connectionLabel.Text = status;
+        _connectionLabel.SetNeedsDisplay();
+    }
+
+    public void UpdateSessions(List<DatabaseSession> sessions) {
+        _sessionListComponent.UpdateSessions(sessions);
+    }
+
+    public void UpdateSessionDetails(DatabaseSession? session) {
+        _sessionDetailsComponent.UpdateSession(session);
+    }
+
+    public void SetDisplayMode(UserAction mode) {
+        // Map UserAction to DisplayModeManager.DisplayMode
+        var displayMode = mode switch {
+            UserAction.ShowSessionDetails => DisplayModeManager.DisplayMode.SessionDetails,
+            UserAction.ShowWaitInfo => DisplayModeManager.DisplayMode.WaitInformation,
+            UserAction.ShowLockingInfo => DisplayModeManager.DisplayMode.LockingInformation,
+            _ => DisplayModeManager.DisplayMode.SessionDetails
+        };
+
+        // Get the DisplayModeManager from the SessionDetailsComponent
+        var displayModeManager = GetDisplayModeManager();
+        if (displayModeManager != null) {
+            displayModeManager.SetMode(displayMode);
+
+            // Update status bar with current mode
+            var modeText = displayModeManager.GetModeDisplayName();
+            _statusBar.UpdateStatus(modeText);
         }
     }
 
-    private void OnSessionsRefreshed(List<DatabaseSession> sessions) {
-        _sessions = sessions;
-        _sessionListComponent.UpdateSessions(sessions);
-        UpdateStatusLabel();
-
-        // Update session details if a session is selected
-        var selectedSession = _sessionListComponent.SelectedSession;
-        _sessionDetailsComponent.UpdateSession(selectedSession);
+    private DisplayModeManager? GetDisplayModeManager() {
+        return _sessionDetailsComponent.DisplayModeManager;
     }
 
-    private void OnDataRefreshError(string errorMessage) {
-        _sessionDetailsComponent.UpdateSession(null);
-        _sessionDetailsComponent.QueryTextView.Text = errorMessage;
-        _sessionDetailsComponent.CurrentQueryTextView.Text = "Error occurred - no query data available";
+
+    public void ShowError(string title, string message) {
+        MessageBox.ErrorQuery(title, message, "OK");
     }
 
-    private void OnModeChanged() {
-        var selectedSession = _sessionListComponent.SelectedSession;
-        _sessionDetailsComponent.UpdateSession(selectedSession);
-        UpdateStatusLabel();
+    public void ShowMessage(string title, string message) {
+        MessageBox.Query(title, message, "OK");
+    }
+
+    public void ShowConnectionDialog() {
+        try {
+            var connectionManager = new ConnectionManager();
+            var connectionDialog = new ConnectionSelectionDialog(connectionManager);
+            Application.Run(connectionDialog);
+
+            // Handle connection selection result
+            if (connectionDialog.ConnectionSelected && connectionDialog.SelectedConnection != null) {
+                // For now, we'll need to handle this through the presenter
+                // This is a temporary implementation - ideally we'd have a callback or event
+                ShowMessage("Connection Selected", $"Selected: {connectionDialog.SelectedConnection.DisplayName}");
+            }
+        } catch (Exception ex) {
+            ShowError("Connection Error", $"Error showing connection dialog: {ex.Message}");
+        }
+    }
+
+    private bool ShowQuitConfirmation() {
+        var result = MessageBox.Query("Confirm Exit",
+            "Are you sure you want to quit DbOps?",
+            "Yes", "No");
+        return result == 0; // 0 = Yes, 1 = No
+    }
+
+    private void HandleTabNavigation(bool reverse) {
+        try {
+            // Get current focused view
+            var currentFocus = Application.Top.MostFocused;
+
+            if (reverse) {
+                // Shift+Tab: Move focus backwards
+                if (currentFocus == _sessionDetailsComponent.QueryTextView ||
+                    currentFocus == _sessionDetailsComponent.CurrentQueryTextView) {
+                    _sessionListComponent.SetFocus();
+                } else {
+                    // Focus on the first text view in session details
+                    _sessionDetailsComponent.QueryTextView.SetFocus();
+                }
+            } else {
+                // Tab: Move focus forwards
+                if (currentFocus == _sessionListComponent.ListView) {
+                    // Focus on the first text view in session details
+                    _sessionDetailsComponent.QueryTextView.SetFocus();
+                } else if (currentFocus == _sessionDetailsComponent.QueryTextView) {
+                    // Move to the second text view
+                    _sessionDetailsComponent.CurrentQueryTextView.SetFocus();
+                } else {
+                    // Go back to session list
+                    _sessionListComponent.SetFocus();
+                }
+            }
+        } catch {
+            // Fallback to session list if navigation fails
+            _sessionListComponent.SetFocus();
+        }
+    }
+
+    // Lifecycle methods
+    public void Initialize() {
+        if (!_initialized) {
+            // Create presenter
+            _presenter = new MainWindowPresenter(this);
+
+            _sessionListComponent.SetFocus();
+            _initialized = true;
+            ViewLoaded?.Invoke();
+        }
+    }
+
+    public void Cleanup() {
+        ViewClosing?.Invoke();
+        _presenter?.Dispose();
     }
 
     private void OnTerminalResized(Application.ResizedEventArgs args) {
         _sessionListComponent.OnTerminalResized();
-        UpdateStatusLabel();
-    }
-
-    private void OnConnectionDeleted(string deletedConnectionId) {
-        // Check if the deleted connection is the currently active one
-        if (_currentConnection != null && _currentConnection.Id == deletedConnectionId) {
-            HandleActiveConnectionDeletion();
-        }
-    }
-
-    private void HandleActiveConnectionDeletion() {
-        try {
-            // Get available connections sorted by usage
-            var availableConnections = _connectionManager.GetConnectionsSortedByUsage();
-
-            if (availableConnections.Any()) {
-                // Try to auto-switch to each available connection until one works
-                bool switchSuccessful = false;
-                Exception? lastException = null;
-
-                foreach (var connection in availableConnections) {
-                    try {
-                        SwitchConnection(connection, isAutoSwitch: true);
-                        switchSuccessful = true;
-                        break; // Successfully switched, exit loop
-                    } catch (Exception ex) {
-                        lastException = ex;
-                        // Continue to try next connection
-                    }
-                }
-
-                if (!switchSuccessful) {
-                    // All connections failed
-                    MessageBox.ErrorQuery("Auto-Switch Failed",
-                        $"Failed to connect to any available connections.\n\n" +
-                        $"Last error: {lastException?.Message}\n\n" +
-                        "Please check your connections and try manually.", "OK");
-                    HandleNoConnectionsAvailable();
-                }
-            } else {
-                // No connections left - enter disconnected state
-                HandleNoConnectionsAvailable();
-            }
-        } catch (Exception ex) {
-            // Unexpected error in the auto-switch process
-            MessageBox.ErrorQuery("Auto-Switch Error",
-                $"Unexpected error during auto-switch: {ex.Message}\n\n" +
-                "Please select a connection manually.", "OK");
-            HandleNoConnectionsAvailable();
-        }
-    }
-
-    private void HandleNoConnectionsAvailable() {
-        try {
-            // Clear session data
-            _sessions.Clear();
-            _sessionListComponent.UpdateSessions(_sessions);
-            _sessionDetailsComponent.UpdateSession(null);
-
-            // Update connection label to show disconnected state
-            _currentConnection = null;
-            _connectionLabel.Text = "No connections configured";
-            _connectionLabel.SetNeedsDisplay();
-
-            // Update status
-            UpdateStatusLabel();
-            SetNeedsDisplay();
-
-            // Show message and auto-open connection manager
-            MessageBox.Query("No Connections",
-                "Last connection deleted. Please add a new connection to continue.", "OK");
-
-            // Auto-open connection manager
-            ShowConnectionSelectionDialog();
-        } catch (Exception ex) {
-            MessageBox.ErrorQuery("Error",
-                $"Error handling disconnected state: {ex.Message}", "OK");
-        }
-    }
-
-    private void UpdateStatusLabel() {
-        var modeText = _displayModeManager.GetModeDisplayName();
-        _statusBar.UpdateStatus(modeText);
-    }
-
-    public override bool ProcessKey(KeyEvent keyEvent) {
-        if (_keyboardHandler.HandleKeyPress(keyEvent)) {
-            return true;
-        }
-        return base.ProcessKey(keyEvent);
-    }
-
-    private void OnTextViewKeyPress(KeyEventEventArgs keyEvent) {
-        if (_keyboardHandler.HandleKeyPress(keyEvent.KeyEvent)) {
-            keyEvent.Handled = true;
-        }
-    }
-
-    private void PromptToQuit() {
-        var result = MessageBox.Query("Quit Application",
-            "Are you sure you want to quit the PostgreSQL Database Monitor?",
-            "Yes", "No");
-
-        if (result == 0) {
-            Application.RequestStop();
-        }
-    }
-
-    private void HandleRefreshRequest() {
-        // Only allow refresh if there's an active connection
-        if (_currentConnection != null) {
-            _dataRefreshService.RefreshSessions();
-        } else {
-            // Show message that no connection is available
-            MessageBox.Query("No Connection",
-                "Cannot refresh sessions - no active database connection.\n\n" +
-                "Please select a connection first.", "OK");
-        }
-    }
-
-    public void Initialize() {
-        _dataRefreshService.RefreshSessions();
-        _sessionListComponent.SetFocus();
-    }
-
-    private string GetConnectionDisplayText() {
-        if (_currentConnection != null) {
-            return $"Connected to: {_currentConnection.DisplayName} ({_currentConnection.ConnectionSummary})";
-        }
-        return $"Connected to: {_dataRefreshService.GetConnectionInfo()}";
-    }
-
-    private void ShowConnectionSelectionDialog() {
-        try {
-            var connectionDialog = new ConnectionSelectionDialog(_connectionManager);
-            Application.Run(connectionDialog);
-
-            // Only switch connection if user actually selected one (not cancelled)
-            if (connectionDialog.ConnectionSelected && connectionDialog.SelectedConnection != null) {
-                // Switch to the selected connection
-                SwitchConnection(connectionDialog.SelectedConnection);
-            }
-            // If cancelled, do nothing - just return to main window
-        } catch (Exception ex) {
-            MessageBox.ErrorQuery("Connection Error",
-                $"Error showing connection dialog: {ex.Message}", "OK");
-        }
-    }
-
-    private void SwitchConnection(DatabaseConnection newConnection, bool isAutoSwitch = false) {
-        try {
-            // Create new PostgreSQL service for the selected connection
-            var newPostgresService = _connectionManager.CreatePostgresService(newConnection);
-
-            // Test the connection
-            if (!newPostgresService.TestConnection()) {
-                if (isAutoSwitch) {
-                    // For auto-switch, throw exception to try next connection
-                    throw new InvalidOperationException($"Connection test failed for {newConnection.DisplayName}");
-                } else {
-                    MessageBox.ErrorQuery("Connection Failed",
-                        $"Could not connect to {newConnection.DisplayName}.\n\n" +
-                        "The connection may be unavailable or the credentials may have changed.", "OK");
-                    return;
-                }
-            }
-
-            // Update the current connection and service
-            _currentConnection = newConnection;
-            _postgresService = newPostgresService;
-
-            // Update connection manager usage tracking
-            _connectionManager.UpdateConnectionLastUsed(newConnection.Id);
-
-            // Update the display
-            _connectionLabel.Text = GetConnectionDisplayText();
-            _connectionLabel.SetNeedsDisplay();
-
-            // Update all services with the new PostgreSQL service
-            _displayModeManager.UpdatePostgresService(_postgresService);
-            _dataRefreshService.UpdatePostgresService(_postgresService);
-
-            // Clear current session details since we're switching databases
-            _sessionDetailsComponent.UpdateSession(null);
-
-            // Refresh sessions with new connection
-            _dataRefreshService.RefreshSessions();
-
-            // Update status
-            UpdateStatusLabel();
-
-            // Force refresh of the main window
-            SetNeedsDisplay();
-
-            if (isAutoSwitch) {
-                // Show brief notification for auto-switch
-                ShowBriefNotification($"Active connection deleted. Switched to {newConnection.DisplayName}");
-            } else {
-                // Show full dialog for manual switch
-                MessageBox.Query("Connection Switched",
-                    $"Successfully switched to {newConnection.DisplayName}!\n\n" +
-                    "The application is now connected to the new database.", "OK");
-            }
-        } catch (Exception ex) {
-            if (isAutoSwitch) {
-                // Re-throw for auto-switch to try next connection
-                throw;
-            } else {
-                MessageBox.ErrorQuery("Connection Switch Error",
-                    $"Error switching connection: {ex.Message}", "OK");
-            }
-        }
-    }
-
-    private void ShowBriefNotification(string message) {
-        // For now, use a simple message box that auto-dismisses quickly
-        // In a more advanced implementation, this could be a toast notification
-        var result = MessageBox.Query("Connection Auto-Switched", message, "OK");
-    }
-
-    // Public method to update connection from external sources
-    public void UpdateConnection(DatabaseConnection connection, SyncPostgresService postgresService) {
-        _currentConnection = connection;
-        _postgresService = postgresService;
-        _connectionLabel.Text = GetConnectionDisplayText();
-
-        // Update all services with the new PostgreSQL service
-        _displayModeManager.UpdatePostgresService(_postgresService);
-        _dataRefreshService.UpdatePostgresService(_postgresService);
-
-        // Clear current session details since we're switching databases
-        _sessionDetailsComponent.UpdateSession(null);
-
-        // Refresh data with new connection
-        _dataRefreshService.RefreshSessions();
-        UpdateStatusLabel();
+        SetNeedsDisplay();
     }
 }

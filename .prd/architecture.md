@@ -14,7 +14,7 @@ A Terminal User Interface (TUI) application for monitoring PostgreSQL database s
 - **Database**: postgres
 - **Port**: 5433
 - **Username**: postgres
-- **Password**: cenozon
+- **Password**: pwd
 
 ## Project Structure
 ```

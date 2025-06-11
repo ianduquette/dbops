@@ -3,7 +3,6 @@ using DbOps.Services;
 namespace DbOps.UI.Components;
 
 public class DisplayModeManager {
-    private SyncPostgresService _postgresService;
     public enum DisplayMode { SessionDetails, WaitInformation, LockingInformation }
 
     private DisplayMode _currentMode = DisplayMode.SessionDetails;
@@ -11,12 +10,8 @@ public class DisplayModeManager {
     public DisplayMode CurrentMode => _currentMode;
     public event Action? ModeChanged;
 
-    public DisplayModeManager(SyncPostgresService postgresService) {
-        _postgresService = postgresService;
-    }
-
-    public void UpdatePostgresService(SyncPostgresService newPostgresService) {
-        _postgresService = newPostgresService;
+    public DisplayModeManager() {
+        // No dependencies needed - much cleaner!
     }
 
     public void SetMode(DisplayMode mode) {
@@ -30,24 +25,9 @@ public class DisplayModeManager {
         return _currentMode switch {
             DisplayMode.SessionDetails => session.GetSessionDetails(),
             DisplayMode.WaitInformation => session.GetWaitInformation(),
-            DisplayMode.LockingInformation => GetLockingInformation(session),
+            DisplayMode.LockingInformation => session.GetLockingInformation(),
             _ => throw new ArgumentOutOfRangeException()
         };
-    }
-
-    private string GetLockingInformation(DatabaseSession session) {
-        try {
-            _postgresService.LoadLockingInformation(session);
-            return session.GetLockingInformation();
-        } catch (Exception ex) {
-            return $"❌ Failed to load locking information\n\n" +
-                   $"Error: {ex.Message}\n\n" +
-                   $"This could be due to:\n" +
-                   $"• Insufficient database permissions\n" +
-                   $"• Connection issues\n" +
-                   $"• PostgreSQL version compatibility\n\n" +
-                   $"Try switching to another view mode.";
-        }
     }
 
     public string GetModeDisplayName() => _currentMode switch {
