@@ -52,24 +52,6 @@ public class SessionManager : IDisposable {
             return false;
         }
     }
-
-    // Overload for backward compatibility with display name only
-    public bool ConnectWithService(SyncPostgresService service, string displayName) {
-        // This method should not be used anymore, but keeping for compatibility
-        // Create a temporary connection for display purposes
-        var tempConnection = new DatabaseConnection {
-            Id = "temp-connection",
-            Name = displayName,
-            Host = "unknown",
-            Port = 0,
-            Database = "unknown",
-            Username = "unknown"
-        };
-
-        return ConnectWithService(service, tempConnection);
-    }
-
-
     public bool Refresh() {
         if (_service == null || _currentConnection == null) {
             ErrorOccurred?.Invoke("No active connection");

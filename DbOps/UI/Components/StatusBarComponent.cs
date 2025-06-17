@@ -37,38 +37,4 @@ public class StatusBarComponent {
         StatusLabel.Text = statusText;
     }
 
-    public void RefreshForTerminalSize() {
-        // This method can be called when terminal is resized
-        // For now, we'll need the current mode text to be passed in
-        // In a future refactoring, we could make this component observe the DisplayModeManager
-    }
-
-    public void SetLoadingStatus(string message) {
-        StatusLabel.Text = message;
-    }
-
-    public void SetErrorStatus(string errorMessage) {
-        // Get terminal width and create responsive status text with error
-        int terminalWidth = Application.Driver?.Cols ?? 120;
-
-        // Truncate error message if too long
-        string shortError = errorMessage.Length > 40 ? errorMessage.Substring(0, 37) + "..." : errorMessage;
-
-        string keyText;
-        if (_keyboardHandler != null) {
-            // Use dynamic key mappings from KeyboardHandler
-            keyText = _keyboardHandler.GetStatusBarKeyText(terminalWidth - shortError.Length - 12); // Reserve space for error
-        } else {
-            // Fallback to hardcoded keys with space-aware formatting
-            if (terminalWidth < 80) {
-                keyText = "F5 Refresh | C Connections | Q Quit";
-            } else if (terminalWidth < 120) {
-                keyText = "[F5] Refresh | [C] Connections | [Q] Quit";
-            } else {
-                keyText = "[↑↓] Navigate | [F5] Refresh | [C] Connections | [Q] Quit";
-            }
-        }
-
-        StatusLabel.Text = $"❌ {shortError} | {keyText}";
-    }
 }
