@@ -34,18 +34,65 @@ dotnet run --project DbOps
 ### First Time Setup
 
 1. Launch the application
-2. Press **'N'** to open connection management
+2. Press **'C'** to open connection management
 3. Press **'+'** to add a new connection
 4. Fill in your PostgreSQL connection details
 5. Press **F5** to test the connection
 6. Press **Ctrl+S** to save
 
+## Building and Deployment
+
+### Cross-Platform Release Builds
+
+You can build release versions for multiple platforms from your Windows machine:
+
+#### Windows (x64)
+```bash
+dotnet publish DbOps -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+```
+
+#### Linux (x64)
+```bash
+dotnet publish DbOps -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
+```
+
+#### macOS (x64)
+```bash
+dotnet publish DbOps -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true
+```
+
+### Build Options
+
+- **`-c Release`**: Optimized release configuration
+- **`-r [runtime]`**: Target runtime identifier
+- **`--self-contained true`**: Includes .NET runtime (no installation required on target)
+- **`-p:PublishSingleFile=true`**: Creates single executable file
+
+### Output Locations
+
+Built executables will be located at:
+- **Windows**: `DbOps/bin/Release/net8.0/win-x64/publish/DbOps.exe`
+- **Linux**: `DbOps/bin/Release/net8.0/linux-x64/publish/DbOps`
+- **macOS**: `DbOps/bin/Release/net8.0/osx-x64/publish/DbOps`
+
+### Framework-Dependent Builds (Smaller Size)
+
+For smaller executables that require .NET runtime on target machine:
+
+```bash
+# Windows
+dotnet publish DbOps -c Release -r win-x64 --self-contained false
+
+# Linux
+dotnet publish DbOps -c Release -r linux-x64 --self-contained false
+```
+
 ## Keyboard Controls
 
 ### Main Application
-- **N** - Open connection management dialog
+- **C** - Open connection management dialog
 - **S** - Switch to session details view
-- **W** - Switch to wait information view  
+- **W** - Switch to wait information view
 - **L** - Switch to locking information view
 - **↑↓** - Navigate through session list
 - **Enter/F5** - Refresh data
@@ -188,6 +235,14 @@ Connection configurations are stored at:
 1. Reduce refresh frequency if auto-refresh is implemented
 2. Check PostgreSQL server performance
 3. Verify network connectivity to database server
+
+### WSL Keyboard Issues (Fixed)
+
+**Problem**: In WSL environments, keyboard commands like 'q', 'n', 's', 'w', 'l' don't work when the session list has focus, but work fine in text views.
+
+**Root Cause**: Terminal.Gui handles key events differently between Windows and Linux. In Windows, unhandled keys bubble up to parent controls, but in Linux/WSL, ListView controls consume all key events by default.
+
+**Solution**: The application now uses a global `OnKeyDown` handler that captures key events before they reach focused controls, ensuring consistent behavior across all platforms.
 
 ## Development Notes
 
