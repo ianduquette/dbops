@@ -57,9 +57,6 @@ public class MainWindowView : Window, IMainView {
                 Focus = new Terminal.Gui.Attribute(Color.White, Color.Black)
             }
         };
-
-        // Setup key event forwarding for text views
-        SetupTextViewKeyHandling();
     }
 
     private void InitializeLayout() {
@@ -109,56 +106,26 @@ public class MainWindowView : Window, IMainView {
         Application.Resized += OnTerminalResized;
     }
 
-    private void SetupTextViewKeyHandling() {
-        // Setup key event handlers for text views to forward application keys
-        _sessionDetailsComponent.QueryTextView.KeyPress += (keyEvent) => {
-            // Don't intercept Tab keys - let them be handled by the main window for navigation
-            if (keyEvent.KeyEvent.Key == Key.Tab || keyEvent.KeyEvent.Key == (Key.ShiftMask | Key.Tab)) {
-                return;
-            }
+    public override bool ProcessKey(KeyEvent keyEvent) {
+        // Handle Tab navigation between components first (before OnKeyDown)
+        if (keyEvent.Key == Key.Tab || keyEvent.Key == (Key.ShiftMask | Key.Tab)) {
+            HandleTabNavigation(keyEvent.Key == (Key.ShiftMask | Key.Tab));
+            return true;
+        }
 
-            var action = _keyboardHandler.GetAction(keyEvent.KeyEvent.Key);
-            if (action.HasValue) {
-                // Handle quit action with confirmation dialog directly
-                if (action.Value == UserAction.Quit) {
-                    if (ShowQuitConfirmation()) {
-                        ActionRequested?.Invoke(action.Value);
-                    }
-                    keyEvent.Handled = true;
-                    return;
-                }
-
-                // Forward other application keys to main window
-                ActionRequested?.Invoke(action.Value);
-                keyEvent.Handled = true;
-            }
-        };
-
-        _sessionDetailsComponent.CurrentQueryTextView.KeyPress += (keyEvent) => {
-            // Don't intercept Tab keys - let them be handled by the main window for navigation
-            if (keyEvent.KeyEvent.Key == Key.Tab || keyEvent.KeyEvent.Key == (Key.ShiftMask | Key.Tab)) {
-                return;
-            }
-
-            var action = _keyboardHandler.GetAction(keyEvent.KeyEvent.Key);
-            if (action.HasValue) {
-                // Handle quit action with confirmation dialog directly
-                if (action.Value == UserAction.Quit) {
-                    if (ShowQuitConfirmation()) {
-                        ActionRequested?.Invoke(action.Value);
-                    }
-                    keyEvent.Handled = true;
-                    return;
-                }
-
-                // Forward other application keys to main window
-                ActionRequested?.Invoke(action.Value);
-                keyEvent.Handled = true;
-            }
-        };
+        // Let OnKeyDown handle all other keys for cross-platform compatibility
+        return base.ProcessKey(keyEvent);
     }
 
-    public override bool ProcessKey(KeyEvent keyEvent) {
+    // Cross-platform key handler - ensures global commands work in both Windows and Linux/WSL
+    // OnKeyDown is called before focused controls receive key events, making it platform-agnostic
+    public override bool OnKeyDown(KeyEvent keyEvent) {
+        // Skip Tab keys - let ProcessKey handle navigation
+        if (keyEvent.Key == Key.Tab || keyEvent.Key == (Key.ShiftMask | Key.Tab)) {
+            return base.OnKeyDown(keyEvent);
+        }
+
+        // Global key handler - works regardless of which control has focus
         var action = _keyboardHandler.GetAction(keyEvent.Key);
         if (action.HasValue) {
             // Handle quit action with confirmation dialog
@@ -172,15 +139,8 @@ public class MainWindowView : Window, IMainView {
             return true;
         }
 
-        // Handle Tab navigation between components
-        if (keyEvent.Key == Key.Tab || keyEvent.Key == (Key.ShiftMask | Key.Tab)) {
-            HandleTabNavigation(keyEvent.Key == (Key.ShiftMask | Key.Tab));
-            return true;
-        }
-
-        return base.ProcessKey(keyEvent);
+        return base.OnKeyDown(keyEvent);
     }
-
 
     // IMainView Implementation
     public void UpdateConnectionStatus(string status) {
