@@ -9,6 +9,7 @@ public class MockMainView : IMainView {
     // Events
     public event Action<int>? SessionSelected;
     public event Action<UserAction>? ActionRequested;
+    public event Action<DatabaseConnection?>? ConnectionSelected;
     public event Action? ViewLoaded;
     public event Action? ViewClosing;
 
@@ -48,7 +49,7 @@ public class MockMainView : IMainView {
         InfoMessages.Add((title, message));
     }
 
-    public void ShowConnectionDialog() {
+    public void ShowConnectionDialog(ConnectionManager connectionManager) {
         ConnectionDialogShownCount++;
     }
 
@@ -65,6 +66,7 @@ public class MockMainView : IMainView {
     // Test helper methods to trigger events
     public void TriggerSessionSelected(int index) => SessionSelected?.Invoke(index);
     public void TriggerActionRequested(UserAction action) => ActionRequested?.Invoke(action);
+    public void TriggerConnectionSelected(DatabaseConnection? connection) => ConnectionSelected?.Invoke(connection);
     public void TriggerViewLoaded() => ViewLoaded?.Invoke();
     public void TriggerViewClosing() => ViewClosing?.Invoke();
 

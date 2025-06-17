@@ -27,7 +27,7 @@ public class SessionManager : IDisposable {
     public DatabaseConnection? CurrentConnection => _currentConnection;
 
 
-    public bool ConnectWithService(SyncPostgresService service, string displayName) {
+    public bool ConnectWithService(SyncPostgresService service, DatabaseConnection connection) {
         try {
             ConnectionStateChanged?.Invoke(ConnectionState.Connecting);
 
@@ -39,17 +39,7 @@ public class SessionManager : IDisposable {
             }
 
             _service = service;
-
-            // Create a minimal DatabaseConnection for display purposes
-            _currentConnection = new DatabaseConnection {
-                Id = "hardcoded-connection",
-                Name = displayName,
-                Host = "127.0.0.1",
-                Port = 5433,
-                Database = "postgres",
-                Username = "postgres",
-                IsDefault = true
-            };
+            _currentConnection = connection;
 
             ConnectionStateChanged?.Invoke(ConnectionState.Connected);
 
@@ -61,6 +51,22 @@ public class SessionManager : IDisposable {
             // Don't invoke ErrorOccurred - let the presenter handle status updates
             return false;
         }
+    }
+
+    // Overload for backward compatibility with display name only
+    public bool ConnectWithService(SyncPostgresService service, string displayName) {
+        // This method should not be used anymore, but keeping for compatibility
+        // Create a temporary connection for display purposes
+        var tempConnection = new DatabaseConnection {
+            Id = "temp-connection",
+            Name = displayName,
+            Host = "unknown",
+            Port = 0,
+            Database = "unknown",
+            Username = "unknown"
+        };
+
+        return ConnectWithService(service, tempConnection);
     }
 
 

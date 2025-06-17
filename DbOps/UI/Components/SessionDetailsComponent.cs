@@ -28,7 +28,9 @@ public class SessionDetailsComponent {
             Height = Dim.Fill() - 3,
             ReadOnly = true,
             Text = "No session selected\n\nUse ↑↓ arrows to navigate sessions",
-            WordWrap = true
+            WordWrap = true,
+            CanFocus = true,
+            TabStop = true
         };
 
         _currentQueryLabel = new Label("Current Query:") {
@@ -43,7 +45,9 @@ public class SessionDetailsComponent {
             Height = Dim.Fill() - 3,
             ReadOnly = true,
             Text = "Select a session to view its current query",
-            WordWrap = true
+            WordWrap = true,
+            CanFocus = true,
+            TabStop = true
         };
 
         SetupEventHandlers();

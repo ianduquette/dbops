@@ -30,6 +30,7 @@ public class MainWindowPresenter : IDisposable {
         // View events
         _view.SessionSelected += OnSessionSelected;
         _view.ActionRequested += OnActionRequested;
+        _view.ConnectionSelected += OnConnectionSelected;
         _view.ViewLoaded += OnViewLoaded;
         _view.ViewClosing += OnViewClosing;
 
@@ -54,32 +55,49 @@ public class MainWindowPresenter : IDisposable {
             return; // Already connecting, ignore this request
         }
 
+        // Check if we have any connections configured
+        if (!_connectionManager.HasConnections) {
+            _view.UpdateConnectionStatus("No database connections configured. Press 'c' to add a connection.");
+            return;
+        }
+
+        // Try to connect using the default connection
+        var defaultConnection = _connectionManager.DefaultConnection;
+        if (defaultConnection == null) {
+            _view.UpdateConnectionStatus("No default connection set. Press 'c' to select a connection.");
+            return;
+        }
+
         _isConnecting = true;
-        _view.UpdateConnectionStatus("Attempting to connect to default PostgreSQL...");
+        _view.UpdateConnectionStatus($"Attempting to connect to {defaultConnection.DisplayName}...");
 
         try {
-            var postgresService = new SyncPostgresService(
-                host: "127.0.0.1",
-                port: 5433,
-                database: "postgres",
-                username: "postgres",
-                password: "pwd"
-            );
-
+            var postgresService = _connectionManager.CreatePostgresService(defaultConnection);
             var success = _sessionManager.ConnectWithService(
                 postgresService,
-                "Local PostgreSQL (127.0.0.1:5433)"
+                defaultConnection
             );
 
             if (success) {
-                _view.UpdateConnectionStatus("Connected to Local PostgreSQL (127.0.0.1:5433)");
+                _view.UpdateConnectionStatus($"Connected to {defaultConnection.DisplayName}");
+                StartDataRefresh();
             } else {
                 _view.UpdateConnectionStatus("Default connection failed - Press 'c' to select connection");
             }
-        } catch (Exception) {
-            _view.UpdateConnectionStatus("Default connection failed - Press 'c' to select connection");
+        } catch (Exception ex) {
+            _view.UpdateConnectionStatus($"Connection failed: {ex.Message} - Press 'c' to select connection");
         } finally {
             _isConnecting = false;
+        }
+    }
+
+    private void StartDataRefresh() {
+        // This method should start the data refresh process
+        // For now, we'll just trigger an initial refresh
+        try {
+            _sessionManager.Refresh();
+        } catch (Exception ex) {
+            _view.ShowError("Refresh Error", $"Failed to start data refresh: {ex.Message}");
         }
     }
 
@@ -122,7 +140,7 @@ public class MainWindowPresenter : IDisposable {
                     break;
                 case UserAction.ShowConnections:
                     if (!_isConnecting) {
-                        _view.ShowConnectionDialog();
+                        _view.ShowConnectionDialog(_connectionManager);
                     }
                     break;
                 case UserAction.Quit:
@@ -164,6 +182,7 @@ public class MainWindowPresenter : IDisposable {
             }
         } catch (Exception) {
             // Handle refresh errors gracefully - don't crash the app
+            ClearCurrentSessionState();
             _sessionManager.Disconnect();
             _view.UpdateConnectionStatus("Connection lost - Press 'c' to reconnect");
         }
@@ -219,13 +238,15 @@ public class MainWindowPresenter : IDisposable {
     }
 
     private SyncPostgresService? GetCurrentPostgresService() {
-        // This is a bit of a hack, but we need access to the current service
-        // In a more sophisticated design, we'd inject this properly
-        if (_sessionManager.IsConnected) {
-            // We know the SessionManager has a service, but it's private
-            // For now, we'll create a new service with the same connection details
-            // This isn't ideal but works for this specific case
-            return new SyncPostgresService("127.0.0.1", 5433, "postgres", "postgres", "pwd");
+        // Get the current connection from session manager
+        var currentConnection = _sessionManager.CurrentConnection;
+        if (currentConnection != null && _sessionManager.IsConnected) {
+            try {
+                return _connectionManager.CreatePostgresService(currentConnection);
+            } catch (Exception) {
+                // If we can't create the service, return null
+                return null;
+            }
         }
         return null;
     }
@@ -308,12 +329,64 @@ public class MainWindowPresenter : IDisposable {
 
     private void OnConnectionDeleted(string connectionId) {
         if (_sessionManager.CurrentConnection?.Id == connectionId) {
+            // Clear UI state before disconnecting
+            ClearCurrentSessionState();
             _sessionManager.Disconnect();
 
             _view.ShowMessage("Connection Deleted",
                 "The active connection was deleted. Please select a new connection.");
-            _view.ShowConnectionDialog();
+            _view.ShowConnectionDialog(_connectionManager);
         }
+    }
+
+    private void OnConnectionSelected(DatabaseConnection? selectedConnection) {
+        if (selectedConnection == null) {
+            return;
+        }
+
+        try {
+            // Clear current UI state when switching connections
+            ClearCurrentSessionState();
+
+            // Disconnect current connection if any
+            if (_sessionManager.IsConnected) {
+                _sessionManager.Disconnect();
+            }
+
+            _isConnecting = true;
+            _view.UpdateConnectionStatus($"Connecting to {selectedConnection.DisplayName}...");
+
+            // Create postgres service and connect
+            var postgresService = _connectionManager.CreatePostgresService(selectedConnection);
+            var success = _sessionManager.ConnectWithService(postgresService, selectedConnection);
+
+            if (success) {
+                _view.UpdateConnectionStatus($"Connected to {selectedConnection.DisplayName}");
+
+                // Update the connection's last used timestamp
+                _connectionManager.UpdateConnectionLastUsed(selectedConnection.Id);
+
+                // Start data refresh
+                StartDataRefresh();
+            } else {
+                _view.UpdateConnectionStatus("Connection failed - Press 'c' to select connection");
+            }
+        } catch (Exception ex) {
+            _view.UpdateConnectionStatus($"Connection failed: {ex.Message} - Press 'c' to select connection");
+        } finally {
+            _isConnecting = false;
+        }
+    }
+
+    private void ClearCurrentSessionState() {
+        // Clear selected session
+        _selectedSession = null;
+
+        // Clear session details in the view
+        _view.UpdateSessionDetails(null);
+
+        // Clear the session list (will be repopulated after connection)
+        _view.UpdateSessions(new List<DatabaseSession>());
     }
 
     public void CleanupSync() {

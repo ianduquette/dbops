@@ -8,6 +8,7 @@ public interface IMainView {
     // Events
     event Action<int>? SessionSelected;
     event Action<UserAction>? ActionRequested;
+    event Action<DatabaseConnection?>? ConnectionSelected;
     event Action? ViewLoaded;
     event Action? ViewClosing;
 
@@ -17,7 +18,7 @@ public interface IMainView {
     void SetDisplayMode(UserAction mode);
     void ShowError(string title, string message);
     void ShowMessage(string title, string message);
-    void ShowConnectionDialog();
+    void ShowConnectionDialog(ConnectionManager connectionManager);
 
     // Lifecycle
     void Initialize();

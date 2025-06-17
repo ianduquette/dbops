@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using DbOps.Domain.Models;
 using Npgsql;
@@ -273,8 +274,23 @@ public class ConnectionManager {
     }
 
     private static string GetConfigFilePath() {
-        var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var configDirectory = Path.Combine(appDataPath, "DbOps");
+        string configDirectory;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            configDirectory = Path.Combine(appDataPath, "DbOps");
+        } else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            configDirectory = Path.Combine(homeDirectory, ".config", "dbops");
+        } else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            configDirectory = Path.Combine(homeDirectory, "Library", "Application Support", "DbOps");
+        } else {
+            // Fallback for unknown platforms
+            var homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            configDirectory = Path.Combine(homeDirectory, ".dbops");
+        }
+
         return Path.Combine(configDirectory, "connections.json");
     }
 

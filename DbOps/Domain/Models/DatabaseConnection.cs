@@ -16,7 +16,7 @@ public class DatabaseConnection {
     public string Database { get; set; } = string.Empty;
 
     [JsonPropertyName("port")]
-    public int Port { get; set; } = 5432;
+    public int Port { get; set; }
 
     [JsonPropertyName("username")]
     public string Username { get; set; } = string.Empty;

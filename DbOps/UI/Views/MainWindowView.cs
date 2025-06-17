@@ -12,6 +12,7 @@ public class MainWindowView : Window, IMainView {
     // Events from IMainView
     public event Action<int>? SessionSelected;
     public event Action<UserAction>? ActionRequested;
+    public event Action<DatabaseConnection?>? ConnectionSelected;
     public event Action? ViewLoaded;
     public event Action? ViewClosing;
 
@@ -241,17 +242,15 @@ public class MainWindowView : Window, IMainView {
         MessageBox.Query(title, message, "OK");
     }
 
-    public void ShowConnectionDialog() {
+    public void ShowConnectionDialog(ConnectionManager connectionManager) {
         try {
-            var connectionManager = new ConnectionManager();
             var connectionDialog = new ConnectionSelectionDialog(connectionManager);
             Application.Run(connectionDialog);
 
             // Handle connection selection result
             if (connectionDialog.ConnectionSelected && connectionDialog.SelectedConnection != null) {
-                // For now, we'll need to handle this through the presenter
-                // This is a temporary implementation - ideally we'd have a callback or event
-                ShowMessage("Connection Selected", $"Selected: {connectionDialog.SelectedConnection.DisplayName}");
+                // Fire the ConnectionSelected event to notify the presenter
+                ConnectionSelected?.Invoke(connectionDialog.SelectedConnection);
             }
         } catch (Exception ex) {
             ShowError("Connection Error", $"Error showing connection dialog: {ex.Message}");
@@ -270,27 +269,37 @@ public class MainWindowView : Window, IMainView {
             // Get current focused view
             var currentFocus = Application.Top.MostFocused;
 
+            // Define the tab order: SessionList -> QueryTextView -> CurrentQueryTextView -> back to SessionList
+            var focusableViews = new View[] {
+                _sessionListComponent.ListView,
+                _sessionDetailsComponent.QueryTextView,
+                _sessionDetailsComponent.CurrentQueryTextView
+            };
+
+            // Find current focus index
+            int currentIndex = -1;
+            for (int i = 0; i < focusableViews.Length; i++) {
+                if (currentFocus == focusableViews[i]) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            // Calculate next focus index
+            int nextIndex;
             if (reverse) {
-                // Shift+Tab: Move focus backwards
-                if (currentFocus == _sessionDetailsComponent.QueryTextView ||
-                    currentFocus == _sessionDetailsComponent.CurrentQueryTextView) {
-                    _sessionListComponent.SetFocus();
-                } else {
-                    // Focus on the first text view in session details
-                    _sessionDetailsComponent.QueryTextView.SetFocus();
-                }
+                // Shift+Tab: Move backwards
+                nextIndex = currentIndex <= 0 ? focusableViews.Length - 1 : currentIndex - 1;
             } else {
-                // Tab: Move focus forwards
-                if (currentFocus == _sessionListComponent.ListView) {
-                    // Focus on the first text view in session details
-                    _sessionDetailsComponent.QueryTextView.SetFocus();
-                } else if (currentFocus == _sessionDetailsComponent.QueryTextView) {
-                    // Move to the second text view
-                    _sessionDetailsComponent.CurrentQueryTextView.SetFocus();
-                } else {
-                    // Go back to session list
-                    _sessionListComponent.SetFocus();
-                }
+                // Tab: Move forwards
+                nextIndex = currentIndex >= focusableViews.Length - 1 ? 0 : currentIndex + 1;
+            }
+
+            // Set focus to the next view
+            if (nextIndex == 0) {
+                _sessionListComponent.SetFocus();
+            } else {
+                focusableViews[nextIndex].SetFocus();
             }
         } catch {
             // Fallback to session list if navigation fails

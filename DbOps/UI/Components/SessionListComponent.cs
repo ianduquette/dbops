@@ -46,6 +46,29 @@ public class SessionListComponent {
         _sessionListView.SetSource(new List<string>());
         SetupColorScheme();
         SetupEventHandlers();
+        SetupFocusHandling();
+    }
+
+    private void SetupFocusHandling() {
+        // Handle focus events to update header styling only
+        _sessionListView.Enter += OnSessionListFocused;
+        _sessionListView.Leave += OnSessionListUnfocused;
+    }
+
+    private void OnSessionListFocused(View.FocusEventArgs args) {
+        // Update header color when focused - subtle change
+        _sessionHeaderLabel.ColorScheme = new ColorScheme {
+            Normal = Application.Driver.MakeAttribute(Color.Black, Color.BrightCyan)
+        };
+        _sessionHeaderLabel.SetNeedsDisplay();
+    }
+
+    private void OnSessionListUnfocused(View.FocusEventArgs args) {
+        // Reset header color when not focused
+        _sessionHeaderLabel.ColorScheme = new ColorScheme {
+            Normal = Application.Driver.MakeAttribute(Color.White, Color.DarkGray)
+        };
+        _sessionHeaderLabel.SetNeedsDisplay();
     }
 
     private void SetupColorScheme() {
@@ -175,6 +198,7 @@ public class SessionListComponent {
     public void SetFocus() {
         _sessionListView.SetFocus();
     }
+
     public void InitializeScrollBar() {
         SetupScrollBar();
     }

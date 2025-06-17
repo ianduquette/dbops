@@ -43,7 +43,7 @@ public class AddConnectionDialog : Dialog {
         y += 2;
 
         Add(new Label("Host:") { X = 1, Y = y });
-        _hostField = new TextField("localhost") { X = 18, Y = y, Width = 40 };
+        _hostField = new TextField("") { X = 18, Y = y, Width = 40 };
         Add(_hostField);
         y++;
 
@@ -53,7 +53,7 @@ public class AddConnectionDialog : Dialog {
         y++;
 
         Add(new Label("Database:") { X = 1, Y = y });
-        _databaseField = new TextField("postgres") { X = 18, Y = y, Width = 40 };
+        _databaseField = new TextField("") { X = 18, Y = y, Width = 40 };
         Add(_databaseField);
         y++;
 
@@ -148,13 +148,14 @@ public class AddConnectionDialog : Dialog {
 
     private void ValidateForm() {
         try {
-            // Simple validation - just check if basic fields have content
+            // Enhanced validation - check all required fields including port
             var hasName = !string.IsNullOrWhiteSpace(_nameField.Text.ToString());
             var hasHost = !string.IsNullOrWhiteSpace(_hostField.Text.ToString());
             var hasDatabase = !string.IsNullOrWhiteSpace(_databaseField.Text.ToString());
             var hasUsername = !string.IsNullOrWhiteSpace(_usernameField.Text.ToString());
+            var hasValidPort = int.TryParse(_portField.Text.ToString(), out var port) && port > 0 && port <= 65535;
 
-            if (hasName && hasHost && hasDatabase && hasUsername) {
+            if (hasName && hasHost && hasDatabase && hasUsername && hasValidPort) {
                 _statusLabel.Text = "Ready to save or test connection";
                 _saveButton.Enabled = true;
                 _testButton.Enabled = true;
@@ -164,15 +165,22 @@ public class AddConnectionDialog : Dialog {
                 if (!hasHost) missing.Add("host");
                 if (!hasDatabase) missing.Add("database");
                 if (!hasUsername) missing.Add("username");
+                if (!hasValidPort) {
+                    if (string.IsNullOrWhiteSpace(_portField.Text.ToString())) {
+                        missing.Add("port");
+                    } else {
+                        missing.Add("valid port (1-65535)");
+                    }
+                }
 
                 _statusLabel.Text = $"Please fill in: {string.Join(", ", missing)}";
                 _saveButton.Enabled = false;
-                _testButton.Enabled = hasHost && hasDatabase && hasUsername; // Allow test without name
+                _testButton.Enabled = hasHost && hasDatabase && hasUsername && hasValidPort; // Allow test without name
             }
         } catch (Exception ex) {
             _statusLabel.Text = $"Form error: {ex.Message}";
-            _saveButton.Enabled = true; // Default to enabled
-            _testButton.Enabled = true;
+            _saveButton.Enabled = false;
+            _testButton.Enabled = false;
         }
     }
 
@@ -188,11 +196,12 @@ public class AddConnectionDialog : Dialog {
             LastUsed = _editingConnection?.LastUsed ?? DateTime.UtcNow
         };
 
-        // Parse port
-        if (int.TryParse(_portField.Text.ToString(), out var port)) {
+        // Parse port - require valid port number
+        if (int.TryParse(_portField.Text.ToString(), out var port) && port > 0 && port <= 65535) {
             connection.Port = port;
         } else {
-            connection.Port = 5432; // Default PostgreSQL port
+            // If port is empty or invalid, use 0 to indicate it needs to be set
+            connection.Port = 0;
         }
 
         return connection;
