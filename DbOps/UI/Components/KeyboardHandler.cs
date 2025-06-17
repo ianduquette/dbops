@@ -10,6 +10,7 @@ public class KeyboardHandler {
         // Application control
         { Key.q, UserAction.Quit },
         { Key.Q, UserAction.Quit },
+        { Key.CtrlMask | Key.Q, UserAction.Quit },
         
         // Connection management
         { Key.c, UserAction.ShowConnections },
@@ -42,6 +43,10 @@ public class KeyboardHandler {
             return true; // Key was handled
         }
         return false; // Key was not handled
+    }
+
+    public UserAction? GetAction(Key key) {
+        return _keyMappings.TryGetValue(key, out var action) ? action : null;
     }
 
     private void ExecuteAction(UserAction action) {

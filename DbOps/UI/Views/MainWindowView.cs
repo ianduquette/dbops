@@ -25,6 +25,9 @@ public class MainWindowView : Window, IMainView {
     // Presenter
     private MainWindowPresenter? _presenter;
 
+    // Keyboard handler
+    private KeyboardHandler _keyboardHandler = null!;
+
     // State
     private bool _initialized = false;
 
@@ -43,8 +46,8 @@ public class MainWindowView : Window, IMainView {
         var displayModeManager = new DisplayModeManager();
         _sessionDetailsComponent = new SessionDetailsComponent(displayModeManager, _sessionListComponent.ListView);
 
-        var keyboardHandler = new KeyboardHandler();
-        _statusBar = new StatusBarComponent(keyboardHandler);
+        _keyboardHandler = new KeyboardHandler();
+        _statusBar = new StatusBarComponent(_keyboardHandler);
 
         _connectionLabel = new Label("Initializing...") {
             X = 1,
@@ -114,7 +117,7 @@ public class MainWindowView : Window, IMainView {
                 return;
             }
 
-            var action = MapKeyToAction(keyEvent.KeyEvent.Key);
+            var action = _keyboardHandler.GetAction(keyEvent.KeyEvent.Key);
             if (action.HasValue) {
                 // Handle quit action with confirmation dialog directly
                 if (action.Value == UserAction.Quit) {
@@ -137,7 +140,7 @@ public class MainWindowView : Window, IMainView {
                 return;
             }
 
-            var action = MapKeyToAction(keyEvent.KeyEvent.Key);
+            var action = _keyboardHandler.GetAction(keyEvent.KeyEvent.Key);
             if (action.HasValue) {
                 // Handle quit action with confirmation dialog directly
                 if (action.Value == UserAction.Quit) {
@@ -156,7 +159,7 @@ public class MainWindowView : Window, IMainView {
     }
 
     public override bool ProcessKey(KeyEvent keyEvent) {
-        var action = MapKeyToAction(keyEvent.Key);
+        var action = _keyboardHandler.GetAction(keyEvent.Key);
         if (action.HasValue) {
             // Handle quit action with confirmation dialog
             if (action.Value == UserAction.Quit) {
@@ -178,22 +181,6 @@ public class MainWindowView : Window, IMainView {
         return base.ProcessKey(keyEvent);
     }
 
-    private UserAction? MapKeyToAction(Key key) => key switch {
-        Key.F5 => UserAction.Refresh,
-        Key.CtrlMask | Key.Q => UserAction.Quit,
-        Key.q => UserAction.Quit,
-        Key.Q => UserAction.Quit,
-        Key.c => UserAction.ShowConnections,
-        Key.C => UserAction.ShowConnections,
-        Key.w => UserAction.ShowWaitInfo,
-        Key.W => UserAction.ShowWaitInfo,
-        Key.s => UserAction.ShowSessionDetails,
-        Key.S => UserAction.ShowSessionDetails,
-        Key.l => UserAction.ShowLockingInfo,
-        Key.L => UserAction.ShowLockingInfo,
-        Key.Enter => UserAction.Refresh,
-        _ => null
-    };
 
     // IMainView Implementation
     public void UpdateConnectionStatus(string status) {
