@@ -1,165 +1,208 @@
-# PostgreSQL Database Monitor
+# DbOps - PostgreSQL Database Operations Monitor
 
-A Terminal User Interface (TUI) application for monitoring PostgreSQL database sessions.
+A Terminal User Interface (TUI) application for monitoring and managing PostgreSQL database sessions with advanced connection management and real-time monitoring capabilities.
 
 ## Features
 
-- **Real-time Session Monitoring**: View active PostgreSQL sessions with key information
-- **Session Details**: Display current SQL statements, connection info, and session state
-- **Simple Navigation**: Easy-to-use keyboard controls
-- **Read-only Interface**: Safe monitoring without modification capabilities
+- **Dynamic Connection Management**: Add, edit, and switch between multiple PostgreSQL connections
+- **Encrypted Connection Storage**: Secure password storage using machine-specific encryption
+- **Real-time Session Monitoring**: View active PostgreSQL sessions with comprehensive details
+- **Multiple Display Modes**: 
+  - Session details view
+  - Wait information display
+  - Database locking information
+- **Interactive Navigation**: Intuitive keyboard controls for all operations
+- **Safe Read-only Operations**: Monitor without modification capabilities
+- **Auto-refresh**: Real-time data updates
 
 ## Requirements
 
 - .NET 8.0 or later
 - PostgreSQL database access
-- Terminal/Console environment
+- Terminal/Console environment (Windows Terminal, Command Prompt, or PowerShell)
 
-## Usage
+## Installation & Usage
 
 ### Running the Application
 
-The application offers one interface:
-1. **Terminal User Interface (TUI)** - Full-featured graphical interface
-
-#### Option 1: VSCode F5 Debug (Recommended)
-
-1. Open the project in VSCode
-2. Press **F5** or go to **Run > Start Debugging**
-3. The application will build automatically and open in an external terminal window
-
-#### Option 2: Using the Launcher Scripts
-
-**PowerShell:**
-```powershell
-.\run-dbops.ps1
-```
-
-**Batch File:**
-```cmd
-run-dbops.bat
-```
-
-These scripts will automatically open the TUI application in a new terminal window, which is required for proper Terminal.Gui functionality.
-
-#### Option 3: Manual Command Line
-
-**In a separate terminal window (not VSCode integrated terminal):**
 ```bash
 dotnet run --project DbOps
 ```
 
-**Note:** The TUI requires a proper terminal environment. VSCode's integrated terminal may not display the TUI correctly. Use Windows Terminal, Command Prompt, or PowerShell in a separate window.
+**Important**: Use a proper terminal environment (Windows Terminal, Command Prompt, or PowerShell). VSCode's integrated terminal may not display the TUI correctly.
 
-#### Option 4: Testing Connection
+### First Time Setup
 
-Before running the main application, you can test the database connection:
-```powershell
-.\test-connection-fast.ps1
+1. Launch the application
+2. Press **'N'** to open connection management
+3. Press **'+'** to add a new connection
+4. Fill in your PostgreSQL connection details
+5. Press **F5** to test the connection
+6. Press **Ctrl+S** to save
+
+## Keyboard Controls
+
+### Main Application
+- **N** - Open connection management dialog
+- **S** - Switch to session details view
+- **W** - Switch to wait information view  
+- **L** - Switch to locking information view
+- **↑↓** - Navigate through session list
+- **Enter/F5** - Refresh data
+- **Q** - Quit application
+
+### Connection Management Dialog
+- **↑↓** - Navigate connections
+- **Enter** - Connect to selected database
+- **+** - Add new connection
+- **F2** - Edit selected connection
+- **Delete** - Remove selected connection
+- **F5** - Test selected connection
+- **Q** - Close dialog
+
+### Add/Edit Connection Dialog
+- **Tab** - Navigate between fields
+- **F5** - Test connection before saving
+- **Ctrl+S** - Save connection
+- **Q** - Cancel and close
+
+## Connection Configuration
+
+### Adding a Connection
+
+1. **Connection Name**: Friendly identifier (e.g., "Production DB", "Local Dev")
+2. **Host**: PostgreSQL server address
+3. **Port**: PostgreSQL port (default: 5432)
+4. **Database**: Target database name
+5. **Username**: PostgreSQL username
+6. **Password**: PostgreSQL password (encrypted when saved)
+7. **Set as Default**: Make this the default connection
+
+### Example Configurations
+
+#### Local Development
+```
+Name: Local Development
+Host: localhost
+Port: 5432
+Database: postgres
+Username: postgres
+Password: your_password
 ```
 
-### Interface Selection
+#### Remote Server
+```
+Name: Production Server
+Host: db.company.com
+Port: 5432
+Database: production_db
+Username: db_user
+Password: secure_password
+```
 
-### Controls
+## Display Information
 
-- **↑↓ Arrow Keys**: Navigate through the session list
-- **Enter**: Refresh the session data
-- **F5**: Refresh the session data (alternative)
-- **Q**: Quit the application
+### Session Details View
+- Process ID (PID)
+- Database name
+- Application name
+- Username
+- Client address
+- Session state
+- Query start time
+- Current SQL statement
+- Connection duration
 
-### Display Information
+### Wait Information View
+- Wait events and types
+- Wait duration
+- Blocking processes
+- Resource contention details
 
-The application shows:
-
-- **Connection Info**: Database host, port, and database name
-- **Session List**: Active sessions with database, application name, PID, and state
-- **Session Details**: Detailed information for the selected session including:
-  - Process ID (PID)
-  - Database name
-  - Application name
-  - Username
-  - Client address
-  - Session state
-  - Query start time
-  - Current SQL statement
-
-## Configuration
-
-Currently configured for:
-- **Host**: localhost
-- **Port**: 5433
-- **Database**: postgres
-- **Username**: postgres
-- **Password**: pwd
+### Locking Information View
+- Lock types and modes
+- Blocked and blocking sessions
+- Lock duration
+- Resource being locked
 
 ## Architecture
 
-The application is built with:
+The application follows a clean Domain-Driven Design architecture:
 
-- **Terminal.Gui**: For the terminal user interface
-- **Npgsql**: For PostgreSQL connectivity
-- **Modular Design**: Separated concerns for services, models, and UI
+### Technology Stack
 
-### Project Structure
+- **Terminal.Gui**: Terminal user interface framework
+- **Npgsql**: PostgreSQL .NET data provider
+- **.NET 8**: Runtime platform
+- **System.Security.Cryptography**: Password encryption
 
-```
-DbOps/
-├── .vscode/
-│   ├── launch.json             # VSCode debug configuration
-│   ├── tasks.json              # VSCode build tasks
-│   └── settings.json           # VSCode workspace settings
-├── Models/
-│   └── DatabaseSession.cs      # Data model for session information
-├── Services/
-│   └── SyncPostgresService.cs  # Database connectivity and queries
-├── UI/
-│   └── MainWindow.cs           # Main TUI window
-├── Queries/
-│   └── PostgresQueries.cs      # SQL queries
-├── Program.cs                  # Application entry point
-├── SimpleConsoleVersion.cs     # Simple console interface
-├── run-dbops.ps1              # PowerShell launcher
-├── run-dbops.bat              # Batch launcher
-└── test-connection-fast.ps1    # Connection testing script
-```
+## Security
+
+- **Encrypted Storage**: All passwords are encrypted using machine-specific keys
+- **Secure Configuration**: Connection details stored in user-specific directories
+- **No Plain Text**: Passwords are never stored in plain text
+- **Machine Binding**: Encrypted data is tied to the specific machine
+
+### Configuration File Location
+
+Connection configurations are stored at:
+- **Windows**: `%APPDATA%\DbOps\connections.json`
+- **Linux/Mac**: `~/.config/DbOps/connections.json`
 
 ## Troubleshooting
 
-### Application Not Displaying Properly
+### Display Issues
 
-**Problem**: The TUI interface doesn't appear or looks corrupted in VSCode's integrated terminal.
+**Problem**: TUI interface doesn't appear correctly or looks corrupted.
 
-**Solution**: Terminal.Gui applications require a proper terminal environment. Use one of these alternatives:
+**Solution**: 
+- Use Windows Terminal, Command Prompt, or PowerShell
+- Avoid VSCode's integrated terminal
+- Ensure terminal supports ANSI escape sequences
 
-1. **Use the launcher scripts**: Run `.\run-dbops.ps1` or `run-dbops.bat` to open in a new terminal window
-2. **Use Simple Console**: Choose option 2 when prompted - works in any terminal including VSCode integrated terminal
-3. **Open Windows Terminal**: Press `Win + R`, type `wt`, press Enter, then navigate to the project folder and run `dotnet run --project DbOps`
-4. **Open Command Prompt**: Press `Win + R`, type `cmd`, press Enter, then navigate to the project folder and run the application
-
-### Database Connection Issues
+### Connection Issues
 
 **Problem**: "Failed to connect to database" error.
 
 **Solutions**:
-1. Verify PostgreSQL is running on localhost:5433
-2. Check that the database "postgres" exists
-3. Verify the username "postgres" and password "pwd" are correct
-4. Run the connection test: `.\test-connection-fast.ps1`
+1. Verify PostgreSQL server is running
+2. Check host and port accessibility
+3. Verify database name exists
+4. Confirm username and password are correct
+5. Use the connection test feature (F5) before saving
 
-### Application Crashes or Freezes
+### Password Decryption Errors
 
-**Problem**: Application stops responding or crashes.
+**Problem**: Cannot decrypt saved passwords.
+
+**Solution**:
+1. Delete the configuration file to reset all connections
+2. Re-add connections with current credentials
+3. Ensure you're on the same machine where connections were created
+
+### Application Performance
+
+**Problem**: Slow response or high CPU usage.
 
 **Solutions**:
-1. Press `Ctrl + C` to force quit if needed
-2. Ensure you're running in a compatible terminal (not VSCode integrated terminal)
-3. Check that .NET 8.0 is properly installed: `dotnet --version`
+1. Reduce refresh frequency if auto-refresh is implemented
+2. Check PostgreSQL server performance
+3. Verify network connectivity to database server
+
+## Development Notes
+
+This application was developed iteratively with AI assistance. Key architectural decisions:
+
+- **Domain-Driven Design**: Clear separation of concerns
+- **Modular UI Components**: Reusable interface elements  
+- **Secure Configuration**: Encrypted credential storage
+- **Extensible Display Modes**: Easy to add new monitoring views
 
 ## Future Enhancements
 
-- Configuration file support with encrypted passwords
-- Multiple database connection management
-- Auto-refresh functionality
-- Session filtering and search
-- Wait event and locking information
-- Export capabilities
+- Auto-refresh configuration
+- Session filtering and search capabilities
+- Export functionality for session data
+- Multiple database type support
+- Performance metrics dashboard
+- Query execution history
